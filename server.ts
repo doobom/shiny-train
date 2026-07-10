@@ -21,7 +21,43 @@ app.use(cors({
 
 app.use(express.json());
 
+import rateLimit from 'express-rate-limit';
+
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per `window` (here, per 15 minutes)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300, // Stricter limit for APIs
+  message: { error: 'API rate limit exceeded.' }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20, // Limit auth endpoints
+  message: { error: 'Too many login attempts, please try again after an hour' }
+});
+
+app.use(globalLimiter);
+app.use('/api', apiLimiter);
+app.use('/api/auth', authLimiter);
+
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_dev';
+
+
+// Mock email/SMS notification system
+const sendTransactionalEmail = (email: string, subject: string, content: string) => {
+  console.log('--------------------------------------------------');
+  console.log(`📧 [EMAIL TO ${email}]`);
+  console.log(`Subject: ${subject}`);
+  console.log(`${content}`);
+  console.log('--------------------------------------------------');
+};
 
 const authenticateToken = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authHeader = req.headers['authorization'];
@@ -115,7 +151,11 @@ app.get('/api/categories', async (req, res) => {
 
 // Products
 app.get('/api/products', async (req, res) => {
-  const { categoryId, q } = req.query;
+  const { categoryId, q, minPrice, maxPrice, sort, page = '1', limit = '20' } = req.query;
+  
+  const pageNum = parseInt(String(page), 10) || 1;
+  const limitNum = parseInt(String(limit), 10) || 20;
+  
   let conditions = [];
   conditions.push(eq(schema.products.status, 'on_shelf'));
   if (categoryId) conditions.push(eq(schema.products.categoryId, String(categoryId)));
@@ -124,20 +164,53 @@ app.get('/api/products', async (req, res) => {
     where: and(...conditions),
   });
 
+  // Filter by query
   if (q) {
     const query = String(q).toLowerCase();
-    prods = prods.filter(p => p.nameZh.toLowerCase().includes(query) || p.nameEn.toLowerCase().includes(query));
+    prods = prods.filter(p => p.nameZh.toLowerCase().includes(query) || p.nameEn.toLowerCase().includes(query) || (p.descZh && p.descZh.toLowerCase().includes(query)));
   }
   
-  // Attach specs
-  const specs = await db.query.productSpecs.findMany({
-    where: inArray(schema.productSpecs.productId, prods.map(p => p.id))
-  });
+  // Fetch all specs first to do price filtering and attach specs
+  let specs = await db.query.productSpecs.findMany();
   
-  res.json(prods.map(p => ({
-    ...p,
-    specs: specs.filter(s => s.productId === p.id)
-  })));
+  // Attach specs and derive min price for each product
+  let productsWithSpecs = prods.map(p => {
+    const pSpecs = specs.filter(s => s.productId === p.id);
+    const pMinPrice = pSpecs.length > 0 ? Math.min(...pSpecs.map(s => s.afterCents)) : 0;
+    return { ...p, specs: pSpecs, minPrice: pMinPrice };
+  });
+
+  // Filter by price range
+  if (minPrice) {
+    productsWithSpecs = productsWithSpecs.filter(p => p.minPrice >= parseInt(String(minPrice), 10));
+  }
+  if (maxPrice) {
+    productsWithSpecs = productsWithSpecs.filter(p => p.minPrice <= parseInt(String(maxPrice), 10));
+  }
+
+  // Sorting
+  if (sort === 'price_asc') {
+    productsWithSpecs.sort((a, b) => a.minPrice - b.minPrice);
+  } else if (sort === 'price_desc') {
+    productsWithSpecs.sort((a, b) => b.minPrice - a.minPrice);
+  } else if (sort === 'newest') {
+    productsWithSpecs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  // Pagination
+  const total = productsWithSpecs.length;
+  const startIndex = (pageNum - 1) * limitNum;
+  const paginatedProducts = productsWithSpecs.slice(startIndex, startIndex + limitNum);
+
+  res.json({
+    data: paginatedProducts,
+    pagination: {
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum)
+    }
+  });
 });
 
 app.get('/api/products/recommendations', async (req, res) => {
@@ -341,6 +414,7 @@ app.post('/api/checkout/preview', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/orders', authenticateToken, async (req, res) => {
+  const user = await db.query.users.findFirst({ where: eq(schema.users.id, (req as any).user.id) });
   const { items, address, paymentMethod, remark } = req.body;
   const userId = (req as any).user.id;
   
@@ -478,11 +552,21 @@ app.post('/api/orders/:id/cancel', async (req, res) => {
 
 app.post('/api/payments/:orderId/charge', async (req, res) => {
   await db.update(schema.orders).set({ status: 'paid' }).where(eq(schema.orders.id, req.params.orderId));
+  const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.orderId) });
+  if (order) {
+    const user = await db.query.users.findFirst({ where: eq(schema.users.id, order.userId) });
+    sendTransactionalEmail(user?.email || 'admin@example.com', 'Payment Successful: ' + req.params.orderId, 'Your payment has been processed successfully.');
+  }
   res.json({ success: true, clientSecret: 'mock_secret' });
 });
 
 app.post('/api/payments/:orderId/voucher', async (req, res) => {
   await db.update(schema.orders).set({ status: 'paid' }).where(eq(schema.orders.id, req.params.orderId));
+  const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.orderId) });
+  if (order) {
+    const user = await db.query.users.findFirst({ where: eq(schema.users.id, order.userId) });
+    sendTransactionalEmail(user?.email || 'admin@example.com', 'Payment Successful: ' + req.params.orderId, 'Your payment has been processed successfully.');
+  }
   res.json({ success: true });
 });
 
@@ -697,7 +781,20 @@ if (process.env.NODE_ENV !== 'production') {
     appType: 'spa',
   }).then(vite => {
     app.use(vite.middlewares);
-    app.listen(PORT, '0.0.0.0', () => {
+    
+// Database initialization endpoint via curl
+// Example: curl -X POST http://localhost:3000/api/admin/init-db
+app.post('/api/admin/init-db', async (req, res) => {
+  try {
+    await seedDatabase();
+    res.json({ success: true, message: 'Database initialized successfully via API.' });
+  } catch (error: any) {
+    console.error('Initialization error:', error);
+    res.status(500).json({ success: false, message: 'Failed to initialize database', error: error.message });
+  }
+});
+
+app.listen(PORT, '0.0.0.0', () => {
       console.log(`[Dev] Server running on http://localhost:${PORT}`);
     });
   });
