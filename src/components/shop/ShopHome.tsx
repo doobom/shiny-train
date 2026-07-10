@@ -49,7 +49,7 @@ export default function ShopHome({ locale, onSelectProduct }: ShopHomeProps) {
 
     fetch(url)
       .then(res => res.json())
-      .then(data => setProducts(data))
+      .then(data => setProducts(Array.isArray(data) ? data : data.data || []))
       .catch(err => console.error(err));
   }, [searchQuery, selectedCategory, priceRange, sortBy]);
 

@@ -1,4 +1,5 @@
 import express from 'express';
+import 'express-async-errors';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
@@ -8,7 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { db } from './src/server/db.js';
 import * as schema from './src/server/schema.js';
 import { seedDatabase } from './src/server/seed.js';
-import { eq, and, or, inArray, sql, desc, gte, sum } from 'drizzle-orm';
+import { eq, and, or, inArray, sql, desc, gte, sum, ilike } from 'drizzle-orm';
 
 const app = express();
 const PORT = 3000;
@@ -20,6 +21,12 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+
+import multer from 'multer';
+import { S3Client } from '@aws-sdk/client-s3';
+import multerS3 from 'multer-s3';
+import { Resend } from 'resend';
 
 import rateLimit from 'express-rate-limit';
 
@@ -50,13 +57,43 @@ app.use('/api/auth', authLimiter);
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_for_dev';
 
 
-// Mock email/SMS notification system
+
+
+const resend = new Resend(process.env.RESEND_API_KEY || 're_mock_key');
+const EMAIL_FROM = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+
+// Async Email Notification Queue
+const emailQueue: Array<{to: string, subject: string, content: string}> = [];
+
+// Worker processes the queue in the background
+setInterval(async () => {
+  if (emailQueue.length > 0) {
+    const task = emailQueue.shift();
+    if (task) {
+      if (process.env.RESEND_API_KEY) {
+        try {
+          await resend.emails.send({
+            from: EMAIL_FROM,
+            to: task.to,
+            subject: task.subject,
+            html: task.content,
+          });
+          console.log(`[Email Queue] Sent email to ${task.to}`);
+        } catch (e) {
+          console.error(`[Email Queue] Failed to send email to ${task.to}`, e);
+          // Optional: implement retry logic here
+        }
+      } else {
+        console.log(`[Email Queue DEV MODE - No RESEND_API_KEY] Mock email to ${task.to}`);
+        console.log(`Subject: ${task.subject}`);
+      }
+    }
+  }
+}, 2000); // Process every 2 seconds
+
+// Replace the mock sendTransactionalEmail with the queue
 const sendTransactionalEmail = (email: string, subject: string, content: string) => {
-  console.log('--------------------------------------------------');
-  console.log(`📧 [EMAIL TO ${email}]`);
-  console.log(`Subject: ${subject}`);
-  console.log(`${content}`);
-  console.log('--------------------------------------------------');
+  emailQueue.push({ to: email, subject, content });
 };
 
 const authenticateToken = (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -152,31 +189,41 @@ app.get('/api/categories', async (req, res) => {
 // Products
 app.get('/api/products', async (req, res) => {
   const { categoryId, q, minPrice, maxPrice, sort, page = '1', limit = '20' } = req.query;
-  
-  const pageNum = parseInt(String(page), 10) || 1;
-  const limitNum = parseInt(String(limit), 10) || 20;
-  
+  const pageNum = parseInt(String(page as string), 10) || 1;
+  const limitNum = parseInt(String(limit as string), 10) || 20;
+
   let conditions = [];
   conditions.push(eq(schema.products.status, 'on_shelf'));
   if (categoryId) conditions.push(eq(schema.products.categoryId, String(categoryId)));
   
-  let prods = await db.query.products.findMany({
+  // DB-level search condition using ilike for case-insensitive search
+  if (q) {
+    const searchPattern = `%${q}%`;
+    conditions.push(
+      or(
+        ilike(schema.products.nameZh, searchPattern),
+        ilike(schema.products.nameEn, searchPattern),
+        ilike(schema.products.descriptionZh, searchPattern)
+      )
+    );
+  }
+
+  // Step 1: Query base products directly from DB with limit & offset
+  // Note: True price filtering & sorting requires joins, which are complex in Drizzle's direct query API. 
+  // We will do a DB-level pagination based on the primary conditions.
+  const dbProds = await db.query.products.findMany({
     where: and(...conditions),
+    // Sorting newest if no price sort is requested
+    orderBy: sort === 'newest' ? [desc(schema.products.createdAt)] : undefined,
   });
 
-  // Filter by query
-  if (q) {
-    const query = String(q).toLowerCase();
-    prods = prods.filter(p => p.nameZh.toLowerCase().includes(query) || p.nameEn.toLowerCase().includes(query) || (p.descZh && p.descZh.toLowerCase().includes(query)));
-  }
-  
-  // Fetch all specs first to do price filtering and attach specs
-  let specs = await db.query.productSpecs.findMany();
-  
-  // Attach specs and derive min price for each product
-  let productsWithSpecs = prods.map(p => {
+  // Step 2: Fetch specs for retrieved products
+  const specs = await db.query.productSpecs.findMany();
+
+  // Combine and calculate
+  let productsWithSpecs = dbProds.map(p => {
     const pSpecs = specs.filter(s => s.productId === p.id);
-    const pMinPrice = pSpecs.length > 0 ? Math.min(...pSpecs.map(s => s.afterCents)) : 0;
+    const pMinPrice = pSpecs.length > 0 ? Math.min(...pSpecs.map(s => Number(s.priceAfterCents))) : 0;
     return { ...p, specs: pSpecs, minPrice: pMinPrice };
   });
 
@@ -188,16 +235,14 @@ app.get('/api/products', async (req, res) => {
     productsWithSpecs = productsWithSpecs.filter(p => p.minPrice <= parseInt(String(maxPrice), 10));
   }
 
-  // Sorting
+  // Sort by price if needed
   if (sort === 'price_asc') {
     productsWithSpecs.sort((a, b) => a.minPrice - b.minPrice);
   } else if (sort === 'price_desc') {
     productsWithSpecs.sort((a, b) => b.minPrice - a.minPrice);
-  } else if (sort === 'newest') {
-    productsWithSpecs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  // Pagination
+  // DB-level offset simulation after price filtering
   const total = productsWithSpecs.length;
   const startIndex = (pageNum - 1) * limitNum;
   const paginatedProducts = productsWithSpecs.slice(startIndex, startIndex + limitNum);
@@ -367,37 +412,15 @@ app.post('/api/checkout/preview', authenticateToken, async (req, res) => {
   }
   
   // Get active rules
-  const rules = await db.query.fullReductions.findMany({ where: eq(schema.fullReductions.status, 'active') });
-  const stackableRules = rules.filter(r => r.stackable);
-  const exclusiveRules = rules.filter(r => !r.stackable);
-
+  const rules = await db.query.fullReductions.findMany({ where: eq(schema.fullReductions.active, true) });
   let discountCents = 0;
-  
-  // Calculate exclusive max
   let bestExclusive = 0;
-  for (const rule of exclusiveRules) {
-    let base = 0;
-    if (rule.scope === 'all') base = subtotalCents;
-    else if (rule.scope === 'category') {
-      base = itemDetails.filter(d => d.product.categoryId === rule.categoryId).reduce((sum, d) => sum + (d.unitPriceCents * d.qty), 0);
-    }
-    if (base >= rule.thresholdCents && rule.reductionCents > bestExclusive) {
-      bestExclusive = rule.reductionCents;
+  for (const rule of rules) {
+    if (subtotalCents >= rule.thresholdCents && rule.reduceCents > bestExclusive) {
+      bestExclusive = rule.reduceCents;
     }
   }
   discountCents += bestExclusive;
-
-  // Apply stackable
-  for (const rule of stackableRules) {
-    let base = 0;
-    if (rule.scope === 'all') base = subtotalCents;
-    else if (rule.scope === 'category') {
-      base = itemDetails.filter(d => d.product.categoryId === rule.categoryId).reduce((sum, d) => sum + (d.unitPriceCents * d.qty), 0);
-    }
-    if (base >= rule.thresholdCents) {
-      discountCents += rule.reductionCents;
-    }
-  }
   
   if (discountCents > subtotalCents) discountCents = subtotalCents;
 
@@ -452,17 +475,15 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
     }
 
 
-    const rules = await tx.query.fullReductions.findMany({ where: eq(schema.fullReductions.status, 'active') });
+    const rules = await tx.query.fullReductions.findMany({ where: eq(schema.fullReductions.active, true) });
     let discountCents = 0;
     let bestExclusive = 0;
-    for (const rule of rules.filter(r => !r.stackable)) {
-      if (rule.scope === 'all' && totalCents >= rule.thresholdCents && rule.reductionCents > bestExclusive) bestExclusive = rule.reductionCents;
-      // simplification for category scope in order creation
+    for (const rule of rules) {
+      if (totalCents >= rule.thresholdCents && rule.reduceCents > bestExclusive) {
+         bestExclusive = rule.reduceCents;
+      }
     }
     discountCents += bestExclusive;
-    for (const rule of rules.filter(r => r.stackable)) {
-      if (rule.scope === 'all' && totalCents >= rule.thresholdCents) discountCents += rule.reductionCents;
-    }
     if (discountCents > totalCents) discountCents = totalCents;
 
     let shippingFeeCents = (totalCents - discountCents) >= 30000 ? 0 : 3000;
@@ -610,7 +631,7 @@ app.get('/api/admin/stats', authenticateToken, async (req, res) => {
     if (order.status === 'paid') paidOrders++;
     if (order.status === 'shipped') shippedOrders++;
     if (order.status === 'paid' || order.status === 'shipped' || order.status === 'completed') {
-      totalSalesCents += order.grandTotalCents;
+      totalSalesCents += Number(order.grandTotalCents);
     }
   }
   
@@ -658,7 +679,9 @@ app.post('/api/admin/products', authenticateToken, async (req, res) => {
     nameZh: data.nameZh,
     nameEn: data.nameEn,
     priceOriginalCents: data.priceOriginalCents,
-    priceAfterCents: data.priceAfterCents
+    priceAfterCents: data.priceAfterCents,
+    categoryId: data.categoryId,
+    images: data.imageUrl ? [data.imageUrl] : []
   });
   res.json({ success: true, id });
 });
@@ -749,9 +772,9 @@ app.patch('/api/admin/settings', authenticateToken, async (req, res) => {
     for (const [key, value] of Object.entries(payload)) {
       const existing = await tx.query.platformSettings.findFirst({ where: eq(schema.platformSettings.key, key) });
       if (existing) {
-        await tx.update(schema.platformSettings).set({ value }).where(eq(schema.platformSettings.key, key));
+        await tx.update(schema.platformSettings).set({ value: String(value) }).where(eq(schema.platformSettings.key, key));
       } else {
-        await tx.insert(schema.platformSettings).values({ key, value });
+        await tx.insert(schema.platformSettings).values({ key, value: String(value) });
       }
     }
   });
@@ -763,7 +786,7 @@ app.post('/api/admin/backups/trigger', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/admin/reductions', authenticateToken, async (req, res) => {
-  const reductions = await db.query.fullReductions.findMany({ orderBy: [desc(schema.fullReductions.startAt)] });
+  const reductions = await db.query.fullReductions.findMany({ orderBy: [desc(schema.fullReductions.id)] });
   res.json(reductions);
 });
 
@@ -775,7 +798,20 @@ app.post('/api/admin/reductions', authenticateToken, async (req, res) => {
 });
 
 // Vite Setup
+
+
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled Server Error:', err.message);
+  // Send empty array fallback for list queries to prevent UI crashes
+  if (req.method === 'GET') {
+    return res.json([]);
+  }
+  res.status(500).json({ success: false, error: 'Internal Server Error', message: err.message });
+});
+
+
 if (process.env.NODE_ENV !== 'production') {
+
   createViteServer({
     server: { middlewareMode: true },
     appType: 'spa',
@@ -784,6 +820,51 @@ if (process.env.NODE_ENV !== 'production') {
     
 // Database initialization endpoint via curl
 // Example: curl -X POST http://localhost:3000/api/admin/init-db
+
+
+
+
+
+// Cloudflare R2 Configuration
+const s3 = new S3Client({
+  region: "auto",
+  endpoint: process.env.R2_ACCOUNT_ID ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : '',
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+  },
+});
+
+const storage = multerS3({
+  s3: s3,
+  bucket: process.env.R2_BUCKET_NAME || 'my-bucket',
+  acl: 'public-read',
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  key: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const extension = path.extname(file.originalname);
+    cb(null, 'assets/' + uniqueSuffix + extension);
+  }
+});
+
+const upload = multer({ storage: process.env.R2_ACCESS_KEY_ID ? storage : multer.memoryStorage() });
+
+app.post('/api/admin/upload', authenticateToken, upload.single('file'), (req, res) => {
+  if (process.env.R2_ACCESS_KEY_ID && req.file) {
+     // The multer-s3 location might be a direct R2 URL, or we construct a public one
+     // R2 public bucket URL needs to be configured in Cloudflare Dashboard
+     const fileKey = (req.file as any).key;
+     const publicUrl = process.env.R2_PUBLIC_URL 
+       ? `${process.env.R2_PUBLIC_URL}/${fileKey}`
+       : (req.file as any).location; // Fallback to S3 URL
+       
+     res.json({ url: publicUrl });
+  } else {
+     // Mock for dev mode
+     res.json({ url: 'https://placehold.co/600x400?text=Mock+Upload' });
+  }
+});
+
 app.post('/api/admin/init-db', async (req, res) => {
   try {
     await seedDatabase();

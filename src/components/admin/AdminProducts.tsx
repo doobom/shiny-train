@@ -16,6 +16,8 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
   const [nameZh, setNameZh] = useState('');
   const [nameEn, setNameEn] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const [originalCents, setOriginalCents] = useState(10000); // HK$100.00
   const [afterCents, setAfterCents] = useState(8000);       // HK$80.00
   const [specNameZh, setSpecNameZh] = useState('標準規格');
@@ -50,6 +52,30 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
     fetchCatalog();
   }, []);
 
+  
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', e.target.files[0]);
+    
+    try {
+      // Need a way to pass authorization token
+      const token = localStorage.getItem('jwt_token');
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      const data = await res.json();
+      if (data.url) setImageUrl(data.url);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nameZh || !nameEn) return;
@@ -81,6 +107,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
       setShowAddForm(false);
       setNameZh('');
       setNameEn('');
+      setImageUrl('');
       fetchCatalog();
       setTimeout(() => setNotif(null), 3000);
     })

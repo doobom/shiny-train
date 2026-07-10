@@ -27,6 +27,7 @@ export default function ProductDetail({
     fetch(`/api/products/${productId}`)
       .then(res => res.json())
       .then(data => {
+        if (Array.isArray(data)) return;
         setProduct(data);
         if (data.specs && data.specs.length > 0) {
           setSelectedSpec(data.specs[0]);
