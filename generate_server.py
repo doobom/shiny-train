@@ -1,4 +1,6 @@
-import express from 'express';
+import os
+
+code = """import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
@@ -509,3 +511,7 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`[Prod] Server running on port ${PORT}`);
   });
 }
+"""
+
+with open('server.ts', 'w') as f:
+    f.write(code)
