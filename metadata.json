@@ -1,0 +1,6 @@
+{
+  "name": "香港生活百货商城系统",
+  "description": "基于SDRS v2.2规范构建的完整全栈电商系统，包含C端用户商城与B端管理后台，配套双语支持、库存管理与营销引擎。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
