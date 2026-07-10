@@ -7,12 +7,13 @@ interface ProductDetailProps {
   locale: Locale;
   userId: string | null;
   onBack: () => void;
+  onRequestLogin: () => void;
   onAddToCart: () => void;
   onInstantBuy: (skuId: string, qty: number) => void;
 }
 
 export default function ProductDetail({ 
-  productId, locale, userId, onBack, onAddToCart, onInstantBuy 
+  productId, locale, userId, onBack, onRequestLogin, onAddToCart, onInstantBuy 
 }: ProductDetailProps) {
   const [product, setProduct] = useState<any>(null);
   const [selectedSpec, setSelectedSpec] = useState<any>(null);
@@ -84,7 +85,7 @@ export default function ProductDetail({
 
   const handleAddToCart = () => {
     if (!userId) {
-      setErr(dict.authRequired);
+      onRequestLogin();
       return;
     }
     if (quantity > 5) {
@@ -116,7 +117,7 @@ export default function ProductDetail({
 
   const handleInstantBuy = () => {
     if (!userId) {
-      setErr(dict.authRequired);
+      onRequestLogin();
       return;
     }
     if (quantity > 5) {

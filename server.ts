@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './src/server/db.js';
 import * as schema from './src/server/schema.js';
+import { seedDatabase } from './src/server/seed.js';
 import { eq, and, or, inArray, sql, desc, gte, sum } from 'drizzle-orm';
 
 const app = express();
@@ -41,6 +42,17 @@ app.use((req, res, next) => {
   next();
 });
 
+
+app.post('/api/seed', async (req, res) => {
+  try {
+    await seedDatabase();
+    res.json({ success: true, message: 'Database seeded successfully.' });
+  } catch (e: any) {
+    res.status(500).json({ code: 'SEED_FAILED', message: e.message });
+  }
+});
+
+// Setup auth interceptor context
 // Auth
 app.post('/api/auth/register', async (req, res) => {
   const { email, password, phone } = req.body;
@@ -236,28 +248,95 @@ app.delete('/api/cart/items/:itemId', authenticateToken, async (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/api/cart/batch', authenticateToken, async (req, res) => {
+  const { action, itemIds, checked } = req.body;
+  const userId = (req as any).user.id;
+  
+  if (action === 'delete') {
+    if (itemIds && itemIds.length > 0) {
+      await db.delete(schema.cartItems).where(inArray(schema.cartItems.id, itemIds));
+    }
+  } else if (action === 'check') {
+    if (itemIds && itemIds.length > 0) {
+      await db.update(schema.cartItems).set({ checked }).where(inArray(schema.cartItems.id, itemIds));
+    }
+  }
+  res.json({ success: true });
+});
+
 // Checkout
 app.post('/api/checkout/preview', authenticateToken, async (req, res) => {
   const { items } = req.body;
-  let totalCents = 0;
-  let shippingFeeCents = 0; // Simple mock
-  let discountCents = 0;
+  let subtotalCents = 0;
+  let itemDetails = [];
   
   const specs = items.length ? await db.query.productSpecs.findMany({
     where: inArray(schema.productSpecs.id, items.map((i: any) => i.skuId))
   }) : [];
   
+  const prods = specs.length ? await db.query.products.findMany({
+    where: inArray(schema.products.id, specs.map((s: any) => s.productId))
+  }) : [];
+  
   for (const item of items) {
     const spec = specs.find((s: any) => s.id === item.skuId);
-    if (spec) totalCents += spec.priceAfterCents * item.qty;
+    const product = prods.find((p: any) => p.id === spec?.productId);
+    
+    if (spec && product) {
+      subtotalCents += spec.priceAfterCents * item.qty;
+      itemDetails.push({
+        spec,
+        product,
+        qty: item.qty,
+        unitPriceCents: spec.priceAfterCents
+      });
+    }
   }
   
+  // Get active rules
+  const rules = await db.query.fullReductions.findMany({ where: eq(schema.fullReductions.status, 'active') });
+  const stackableRules = rules.filter(r => r.stackable);
+  const exclusiveRules = rules.filter(r => !r.stackable);
+
+  let discountCents = 0;
+  
+  // Calculate exclusive max
+  let bestExclusive = 0;
+  for (const rule of exclusiveRules) {
+    let base = 0;
+    if (rule.scope === 'all') base = subtotalCents;
+    else if (rule.scope === 'category') {
+      base = itemDetails.filter(d => d.product.categoryId === rule.categoryId).reduce((sum, d) => sum + (d.unitPriceCents * d.qty), 0);
+    }
+    if (base >= rule.thresholdCents && rule.reductionCents > bestExclusive) {
+      bestExclusive = rule.reductionCents;
+    }
+  }
+  discountCents += bestExclusive;
+
+  // Apply stackable
+  for (const rule of stackableRules) {
+    let base = 0;
+    if (rule.scope === 'all') base = subtotalCents;
+    else if (rule.scope === 'category') {
+      base = itemDetails.filter(d => d.product.categoryId === rule.categoryId).reduce((sum, d) => sum + (d.unitPriceCents * d.qty), 0);
+    }
+    if (base >= rule.thresholdCents) {
+      discountCents += rule.reductionCents;
+    }
+  }
+  
+  if (discountCents > subtotalCents) discountCents = subtotalCents;
+
+  let shippingFeeCents = (subtotalCents - discountCents) >= 30000 ? 0 : 3000; // Free shipping over HK$300, else HK$30
+  let totalCents = subtotalCents + shippingFeeCents - discountCents;
+  
   res.json({
-    totalCents,
+    subtotalCents,
     shippingFeeCents,
     discountCents,
-    grandTotalCents: totalCents + shippingFeeCents - discountCents,
-    availableCoupons: []
+    totalCents,
+    itemDetails
   });
 });
 
@@ -298,14 +377,34 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
         .where(eq(schema.inventory.skuId, item.skuId));
     }
 
+
+    const rules = await tx.query.fullReductions.findMany({ where: eq(schema.fullReductions.status, 'active') });
+    let discountCents = 0;
+    let bestExclusive = 0;
+    for (const rule of rules.filter(r => !r.stackable)) {
+      if (rule.scope === 'all' && totalCents >= rule.thresholdCents && rule.reductionCents > bestExclusive) bestExclusive = rule.reductionCents;
+      // simplification for category scope in order creation
+    }
+    discountCents += bestExclusive;
+    for (const rule of rules.filter(r => r.stackable)) {
+      if (rule.scope === 'all' && totalCents >= rule.thresholdCents) discountCents += rule.reductionCents;
+    }
+    if (discountCents > totalCents) discountCents = totalCents;
+
+    let shippingFeeCents = (totalCents - discountCents) >= 30000 ? 0 : 3000;
     await tx.insert(schema.orders).values({
       id: orderId,
       userId,
       status: 'pending_payment',
       totalCents,
-      shippingFeeCents: 0,
-      discountCents: 0,
-      grandTotalCents: totalCents,
+      shippingFeeCents,
+      discountCents,
+      grandTotalCents: totalCents + shippingFeeCents - discountCents,
+      addressRecipient: address?.recipient,
+      addressPhone: address?.phoneEncrypted,
+      addressDetail: address?.detail,
+      paymentMethod: paymentMethod,
+      remark: remark
     });
     
     for (const oi of orderItemsData) {
@@ -326,7 +425,38 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
 app.get('/api/orders/mine/:userId', authenticateToken, async (req, res) => {
   const userId = (req as any).user.id;
   const list = await db.query.orders.findMany({ where: eq(schema.orders.userId, userId), orderBy: [desc(schema.orders.createdAt)] });
-  res.json(list);
+  
+  const formatted = [];
+  for (const order of list) {
+    const items = await db.query.orderItems.findMany({ where: eq(schema.orderItems.orderId, order.id) });
+    const formattedItems = [];
+    for (const item of items) {
+      const spec = await db.query.productSpecs.findFirst({ where: eq(schema.productSpecs.id, item.skuId) });
+      const product = spec ? await db.query.products.findFirst({ where: eq(schema.products.id, spec.productId) }) : null;
+      
+      formattedItems.push({
+        id: item.id,
+        qty: item.qty,
+        productSnapshot: {
+          imageUrl: product?.images?.[0] || '',
+          nameZh: product?.nameZh || '',
+          nameEn: product?.nameEn || '',
+          specNameZh: spec?.specNameZh || '',
+          specNameEn: spec?.specNameEn || ''
+        }
+      });
+    }
+    
+    formatted.push({
+      id: order.id,
+      orderNo: order.id,
+      totalCents: order.grandTotalCents,
+      status: order.status,
+      items: formattedItems
+    });
+  }
+  
+  res.json(formatted);
 });
 
 app.get('/api/orders/:id', async (req, res) => {
@@ -379,17 +509,61 @@ app.get('/api/feedbacks/mine/:userId', authenticateToken, async (req, res) => {
 
 // Admin endpoints
 app.get('/api/admin/stats', authenticateToken, async (req, res) => {
+  const orders = await db.query.orders.findMany();
+  const products = await db.query.products.findMany();
+  const inventory = await db.query.inventory.findMany();
+  
+  let totalSalesCents = 0;
+  let totalOrdersCount = orders.length;
+  let pendingOrders = 0;
+  let paidOrders = 0;
+  let shippedOrders = 0;
+  let productsCount = products.length;
+  let stockAlerts = 0;
+  
+  for (const order of orders) {
+    if (order.status === 'pending_payment') pendingOrders++;
+    if (order.status === 'paid') paidOrders++;
+    if (order.status === 'shipped') shippedOrders++;
+    if (order.status === 'paid' || order.status === 'shipped' || order.status === 'completed') {
+      totalSalesCents += order.grandTotalCents;
+    }
+  }
+  
+  for (const inv of inventory) {
+    if (inv.stock <= inv.warnThreshold) stockAlerts++;
+  }
+  
   res.json({
-    todaySalesTotal: 100000,
-    todayOrdersCount: 20,
-    pendingShipmentCount: 5,
-    pendingRefundCount: 0
+    totalSalesCents,
+    totalOrdersCount,
+    productsCount,
+    stockAlerts,
+    pendingOrders,
+    paidOrders,
+    shippedOrders
   });
 });
 
 app.get('/api/admin/products', authenticateToken, async (req, res) => {
-  const prods = await db.query.products.findMany();
-  res.json(prods);
+  const prods = await db.query.products.findMany({ orderBy: [desc(schema.products.createdAt)] });
+  const allSpecs = await db.query.productSpecs.findMany();
+  const allInv = await db.query.inventory.findMany();
+
+  const result = prods.map(prod => {
+    const specs = allSpecs.filter(s => s.productId === prod.id).map(s => {
+      const inv = allInv.find(i => i.skuId === s.id) || { stock: 0, lockedStock: 0, warnThreshold: 10 };
+      return {
+        ...s,
+        stock: inv.stock,
+        lockedStock: inv.lockedStock,
+        warnThreshold: inv.warnThreshold
+      };
+    });
+    return { ...prod, specs };
+  });
+
+  res.json(result);
 });
 
 app.post('/api/admin/products', authenticateToken, async (req, res) => {
@@ -417,11 +591,28 @@ app.patch('/api/admin/inventory/:skuId', authenticateToken, async (req, res) => 
 
 app.get('/api/admin/orders', authenticateToken, async (req, res) => {
   const list = await db.query.orders.findMany({ orderBy: [desc(schema.orders.createdAt)] });
-  res.json(list);
+  
+  const formatted = [];
+  for (const order of list) {
+    const user = await db.query.users.findFirst({ where: eq(schema.users.id, order.userId) });
+    formatted.push({
+      id: order.id,
+      orderNo: order.id,
+      userEmail: user?.email || 'Unknown',
+      totalCents: order.grandTotalCents,
+      status: order.status,
+      paymentStatus: order.status === 'pending_payment' ? 'pending' : 'paid',
+      shippingMethod: 'Standard',
+      trackingNo: order.remark || '',
+      createdAt: order.createdAt
+    });
+  }
+  
+  res.json(formatted);
 });
 
 app.post('/api/admin/orders/:id/ship', authenticateToken, async (req, res) => {
-  await db.update(schema.orders).set({ status: 'shipped' }).where(eq(schema.orders.id, req.params.id));
+  await db.update(schema.orders).set({ status: 'shipped', remark: req.body.trackingNo }).where(eq(schema.orders.id, req.params.id));
   res.json({ success: true });
 });
 
@@ -437,11 +628,24 @@ app.post('/api/admin/orders/:id/close', authenticateToken, async (req, res) => {
 
 app.get('/api/admin/feedbacks', authenticateToken, async (req, res) => {
   const list = await db.query.feedbacks.findMany({ orderBy: [desc(schema.feedbacks.createdAt)] });
-  res.json(list);
+  const formatted = [];
+  for (const fb of list) {
+    const user = await db.query.users.findFirst({ where: eq(schema.users.id, fb.userId) });
+    formatted.push({
+      id: fb.id,
+      type: fb.type || 'general',
+      contact: fb.contact || user?.email || 'Anonymous',
+      content: fb.content,
+      reply: fb.adminReply,
+      status: fb.status,
+      orderId: fb.orderId
+    });
+  }
+  res.json(formatted);
 });
 
 app.post('/api/admin/feedbacks/:id/reply', authenticateToken, async (req, res) => {
-  await db.update(schema.feedbacks).set({ adminReply: req.body.adminReply, status: 'resolved' }).where(eq(schema.feedbacks.id, req.params.id));
+  await db.update(schema.feedbacks).set({ adminReply: req.body.reply, status: 'resolved' }).where(eq(schema.feedbacks.id, req.params.id));
   res.json({ success: true });
 });
 
@@ -451,18 +655,39 @@ app.get('/api/admin/audit-logs', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/admin/settings', authenticateToken, async (req, res) => {
-  res.json({
-    reductions: [],
-    shipping: []
-  });
+  const settings = await db.query.platformSettings.findMany();
+  res.json(settings);
 });
 
 app.patch('/api/admin/settings', authenticateToken, async (req, res) => {
+  const payload = req.body;
+  await db.transaction(async (tx) => {
+    for (const [key, value] of Object.entries(payload)) {
+      const existing = await tx.query.platformSettings.findFirst({ where: eq(schema.platformSettings.key, key) });
+      if (existing) {
+        await tx.update(schema.platformSettings).set({ value }).where(eq(schema.platformSettings.key, key));
+      } else {
+        await tx.insert(schema.platformSettings).values({ key, value });
+      }
+    }
+  });
   res.json({ success: true });
 });
 
 app.post('/api/admin/backups/trigger', authenticateToken, async (req, res) => {
   res.json({ success: true, message: 'Backup triggered.' });
+});
+
+app.get('/api/admin/reductions', authenticateToken, async (req, res) => {
+  const reductions = await db.query.fullReductions.findMany({ orderBy: [desc(schema.fullReductions.startAt)] });
+  res.json(reductions);
+});
+
+app.post('/api/admin/reductions', authenticateToken, async (req, res) => {
+  const data = req.body;
+  const id = `fr_${uuidv4().substring(0,8)}`;
+  await db.insert(schema.fullReductions).values({ ...data, id });
+  res.json({ success: true, id });
 });
 
 // Vite Setup

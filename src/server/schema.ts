@@ -73,6 +73,11 @@ export const orders = pgTable('orders', {
   shippingFeeCents: integer('shipping_fee_cents').notNull(),
   discountCents: integer('discount_cents').notNull(),
   grandTotalCents: integer('grand_total_cents').notNull(),
+  addressRecipient: varchar('address_recipient', { length: 100 }),
+  addressPhone: varchar('address_phone', { length: 50 }),
+  addressDetail: text('address_detail'),
+  paymentMethod: varchar('payment_method', { length: 50 }),
+  remark: text('remark'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

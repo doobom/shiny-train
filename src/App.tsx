@@ -38,6 +38,10 @@ export default function App() {
   const [activePaymentOrderId, setActivePaymentOrderId] = useState<string | null>(null);
   const [cartCount, setCartCount] = useState<number>(0);
 
+    useEffect(() => {
+    document.title = locale === 'zh-HK' ? '香港生活百貨商城' : 'HK Life Mall';
+  }, [locale]);
+
   useEffect(() => {
     const token = localStorage.getItem('jwt_token');
     const storedUserId = localStorage.getItem('user_id');
@@ -113,7 +117,7 @@ export default function App() {
 
   const dict = {
     'zh-HK': {
-      brand: 'APCUBE 香港精品百貨',
+      brand: '香港生活百貨商城',
       tagline: '正品直郵 • 極速順豐 • 安全支付',
       shopTab: '精品商城',
       adminConsole: '後台管理系統',
@@ -122,10 +126,10 @@ export default function App() {
       customerSwitch: '切換顧客身份',
       userSiuMing: '陳小明 (Chan Siu Ming)',
       userDavid: '張偉 (David Cheung - Guest)',
-      footerMsg: '© 2026 APCUBE DEPARTMENT STORE LIMITED. 根據 SDRS v2.2 安全架構規範部署。',
+      footerMsg: '© 2026 香港生活百貨商城 (HK Life Mall) 版權所有。',
     },
     'en': {
-      brand: 'APCUBE HK Luxury Goods',
+      brand: 'HK Life Mall',
       tagline: 'Direct Dispatch • SF Express • Secured Pay',
       shopTab: 'Shop Catalog',
       adminConsole: 'Admin Console',
@@ -134,7 +138,7 @@ export default function App() {
       customerSwitch: 'Switch Persona',
       userSiuMing: 'Chan Siu Ming (Member)',
       userDavid: 'David Cheung (Guest User)',
-      footerMsg: '© 2026 APCUBE DEPARTMENT STORE LIMITED. Configured to SDRS v2.2 compliance protocols.',
+      footerMsg: '© 2026 HK Life Mall. All Rights Reserved.',
     }
   }[locale];
 
@@ -167,13 +171,21 @@ export default function App() {
           {/* Navigation Controls */}
           <div className="flex items-center gap-1.5 sm:gap-3">
             {/* Locale Selector */}
-            {tokenReady && (
+            {tokenReady ? (
               <button
                 onClick={handleLogout}
                 className="text-gray-500 hover:text-red-600 font-bold px-3 py-2 rounded-xl text-xs transition-colors flex items-center gap-1"
               >
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">{locale === 'zh-HK' ? '登出' : 'Logout'}</span>
+              </button>
+            ) : !isAdminMode && (
+              <button
+                onClick={() => setCurrentView('profile')}
+                className="text-neutral-900 bg-amber-400 hover:bg-amber-500 font-bold px-3 py-2 rounded-xl text-xs transition-colors flex items-center gap-1 shadow-sm"
+              >
+                <LogIn className="h-4 w-4" />
+                <span className="hidden sm:inline">{locale === 'zh-HK' ? '登入' : 'Login'}</span>
               </button>
             )}
             <button
@@ -245,7 +257,7 @@ export default function App() {
 
       {/* Main Content Space */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8">
-        {!tokenReady ? (
+        {!tokenReady && (isAdminMode || !['shop_home', 'product_detail'].includes(currentView)) ? (
           <AuthView onLoginSuccess={handleLoginSuccess} />
         ) : !isAdminMode ? (
           // Renders C-End Customer shopping screens
@@ -263,6 +275,7 @@ export default function App() {
                 locale={locale}
                 userId={userId}
                 onBack={() => setCurrentView('shop_home')}
+                onRequestLogin={() => setCurrentView('profile')}
                 onAddToCart={() => {
                   fetchCartCount();
                 }}
