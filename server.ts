@@ -73,29 +73,6 @@ app.post('/api/auth/login', async (req, res) => {
   res.json({ success: true, token, user: { id: user.id, email: user.email, locale: user.locale } });
 });
 
-app.post('/api/auth/simulate', async (req, res) => {
-  const { userId } = req.body;
-  const mappedId = userId === 'user_1' ? 'usr_1' : (userId === 'user_2' ? 'usr_2' : userId);
-  let user = await db.query.users.findFirst({ where: eq(schema.users.id, mappedId) });
-  
-  if (!user && mappedId === 'usr_2') {
-    user = {
-      id: 'usr_2',
-      email: 'david@gmail.com',
-      passwordHash: 'dummy',
-      locale: 'zh-HK',
-      status: 'active',
-    } as any;
-    await db.insert(schema.users).values(user);
-    await db.insert(schema.carts).values({ id: `cart_${user.id}`, userId: user.id });
-  }
-
-  if (!user) return res.status(404).json({ code: 'USER_NOT_FOUND', message: 'User not found.' });
-  
-  const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ success: true, token, user: { id: user.id, email: user.email, locale: user.locale } });
-});
-
 app.post('/api/auth/password/forgot', async (req, res) => {
   const { email } = req.body;
   const user = await db.query.users.findFirst({ where: eq(schema.users.email, email) });

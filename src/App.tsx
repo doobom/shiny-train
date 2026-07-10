@@ -9,6 +9,7 @@ import CartView from './components/shop/CartView.tsx';
 import CheckoutView from './components/shop/CheckoutView.tsx';
 import PaymentView from './components/shop/PaymentView.tsx';
 import UserProfile from './components/shop/UserProfile.tsx';
+import AuthView from './components/shop/AuthView.tsx';
 
 // Admin modules
 import AdminDashboard from './components/admin/AdminDashboard.tsx';
@@ -23,40 +24,49 @@ type AdminTab = 'dashboard' | 'products' | 'orders' | 'marketing' | 'feedback' |
 
 export default function App() {
   const [locale, setLocale] = useState<Locale>('zh-HK');
+  // @ts-ignore
   const appMode = import.meta.env.VITE_APP_MODE || 'both'; // 'user' | 'admin' | 'both'
   const [isAdminMode, setIsAdminMode] = useState<boolean>(appMode === 'admin');
   const [currentView, setCurrentView] = useState<ViewState>('shop_home');
   const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('dashboard');
 
-  // Simulation user auth states
-  const [userId, setUserId] = useState<string>('user_1');
-  const [userEmail, setUserEmail] = useState<string>('siuming@gmail.com');
+  // Authentication state
+  const [userId, setUserId] = useState<string>('');
+  const [userEmail, setUserEmail] = useState<string>('');
   const [tokenReady, setTokenReady] = useState<boolean>(false);
-  
-  // Selection references
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [activePaymentOrderId, setActivePaymentOrderId] = useState<string | null>(null);
-
-  // Global Cart counts
   const [cartCount, setCartCount] = useState<number>(0);
 
-  // Sync token whenever userId changes
   useEffect(() => {
+    const token = localStorage.getItem('jwt_token');
+    const storedUserId = localStorage.getItem('user_id');
+    const storedUserEmail = localStorage.getItem('user_email');
+    if (token && storedUserId) {
+      setUserId(storedUserId);
+      setUserEmail(storedUserEmail || '');
+      setTokenReady(true);
+    }
+  }, []);
+
+  const handleLoginSuccess = (token: string, user: any) => {
+    localStorage.setItem('jwt_token', token);
+    localStorage.setItem('user_id', user.id);
+    localStorage.setItem('user_email', user.email);
+    setUserId(user.id);
+    setUserEmail(user.email);
+    setTokenReady(true);
+  };
+  
+  const handleLogout = () => {
+    localStorage.removeItem('jwt_token');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('user_email');
+    setUserId('');
+    setUserEmail('');
     setTokenReady(false);
-    fetch('/api/auth/simulate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId })
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.token) {
-          localStorage.setItem('jwt_token', data.token);
-          setTokenReady(true);
-        }
-      })
-      .catch(e => console.error('Simulate auth error:', e));
-  }, [userId]);
+    setCurrentView('shop_home');
+  };
 
   const fetchCartCount = () => {
     if (!tokenReady) return;
@@ -130,42 +140,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans selection:bg-amber-100 selection:text-amber-900 text-gray-800 antialiased">
-      {/* Simulation Persona Bar */}
-      <div className="bg-neutral-900 text-white/90 text-[10px] px-6 py-2 border-b border-neutral-800 flex flex-wrap justify-between items-center gap-3 font-semibold font-mono">
-        <div className="flex items-center gap-2">
-          <Layers className="h-3.5 w-3.5 text-amber-500" />
-          <span>SDRS v2.2 RUNTIME CONTAINER</span>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5">
-            <span className="text-white/50">{dict.customerSwitch}:</span>
-            <select 
-              value={userId} 
-              onChange={e => {
-                const sel = e.target.value;
-                setUserId(sel);
-                setUserEmail(sel === 'user_1' ? 'siuming@gmail.com' : 'david@gmail.com');
-              }}
-              className="bg-neutral-800 text-amber-300 border border-neutral-700 rounded px-2 py-0.5 text-[10px] font-semibold cursor-pointer outline-none"
-            >
-              <option value="user_1">{dict.userSiuMing}</option>
-              <option value="user_2">{dict.userDavid}</option>
-            </select>
-          </div>
-          {appMode === 'both' && (
-            <button 
-              onClick={() => setIsAdminMode(!isAdminMode)}
-              className="bg-amber-500 hover:bg-amber-600 text-black px-2.5 py-0.5 rounded font-bold transition-all text-[9px] uppercase tracking-wider flex items-center gap-1 shadow-sm"
-            >
-              <Shield className="h-3 w-3" />
-              {isAdminMode ? 'Exit Admin' : 'Enter Admin'}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Primary Header Section */}
+{/* Primary Header Section */}
       <header className="bg-white border-b border-gray-150 sticky top-0 z-40 shadow-xs">
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
           {/* Brand Logo Info */}
@@ -192,6 +167,15 @@ export default function App() {
           {/* Navigation Controls */}
           <div className="flex items-center gap-1.5 sm:gap-3">
             {/* Locale Selector */}
+            {tokenReady && (
+              <button
+                onClick={handleLogout}
+                className="text-gray-500 hover:text-red-600 font-bold px-3 py-2 rounded-xl text-xs transition-colors flex items-center gap-1"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">{locale === 'zh-HK' ? '登出' : 'Logout'}</span>
+              </button>
+            )}
             <button
               onClick={toggleLanguage}
               className="border border-gray-200 hover:border-neutral-950 hover:bg-gray-50 text-neutral-800 font-bold px-3 py-2 rounded-xl text-xs transition-colors"
@@ -262,9 +246,7 @@ export default function App() {
       {/* Main Content Space */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8">
         {!tokenReady ? (
-          <div className="flex h-full items-center justify-center py-20 text-gray-400 font-mono text-xs">
-            Authenticating Sandbox...
-          </div>
+          <AuthView onLoginSuccess={handleLoginSuccess} />
         ) : !isAdminMode ? (
           // Renders C-End Customer shopping screens
           <div className="space-y-6">
