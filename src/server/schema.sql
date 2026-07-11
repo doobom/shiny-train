@@ -173,3 +173,74 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+
+-- ==========================================
+-- AUTO-GENERATED MIGRATIONS (to patch existing DBs)
+-- ==========================================
+DO $$
+BEGIN
+    BEGIN
+        ALTER TABLE users ADD COLUMN phone_encrypted VARCHAR(255);
+    EXCEPTION WHEN duplicate_column THEN END;
+    
+    BEGIN
+        ALTER TABLE carts ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    EXCEPTION WHEN duplicate_column THEN END;
+
+    BEGIN
+        ALTER TABLE cart_items ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    EXCEPTION WHEN duplicate_column THEN END;
+
+    BEGIN
+        ALTER TABLE audit_logs ADD COLUMN resource VARCHAR(255);
+    EXCEPTION WHEN duplicate_column THEN END;
+END $$;
+
+-- For discounts, since the structure changed completely:
+DROP TABLE IF EXISTS discounts CASCADE;
+CREATE TABLE discounts (
+    id VARCHAR(50) PRIMARY KEY,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    value INT NOT NULL,
+    min_order_value_cents INT,
+    active BOOLEAN DEFAULT TRUE,
+    valid_until TIMESTAMP
+);
+
+DO $$
+BEGIN
+    BEGIN
+        ALTER TABLE banners ADD COLUMN link_url VARCHAR(255);
+    EXCEPTION WHEN duplicate_column THEN END;
+
+    BEGIN
+        ALTER TABLE banners ADD COLUMN disabled BOOLEAN DEFAULT FALSE;
+    EXCEPTION WHEN duplicate_column THEN END;
+END $$;
+DROP TABLE IF EXISTS announcements CASCADE;
+CREATE TABLE announcements (
+    id VARCHAR(50) PRIMARY KEY,
+    title_zh VARCHAR(255) NOT NULL,
+    title_en VARCHAR(255) NOT NULL,
+    content_zh TEXT,
+    content_en TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+DROP TABLE IF EXISTS faqs CASCADE;
+CREATE TABLE faqs (
+    id VARCHAR(50) PRIMARY KEY,
+    question_zh VARCHAR(255) NOT NULL,
+    question_en VARCHAR(255) NOT NULL,
+    answer_zh TEXT,
+    answer_en TEXT,
+    sort INT DEFAULT 0
+);
+DROP TABLE IF EXISTS full_reductions CASCADE;
+CREATE TABLE full_reductions (
+    id VARCHAR(50) PRIMARY KEY,
+    threshold_cents INT NOT NULL,
+    reduce_cents INT NOT NULL,
+    active BOOLEAN DEFAULT TRUE
+);
