@@ -13,7 +13,7 @@ export async function seedDatabase() {
     await pool.query(schemaSql);
     console.log('Schema created successfully.');
   } catch (err) {
-    console.error("Failed to create schema:", err); throw err;
+    console.error("Failed to create schema:", err); console.error(err.stack); throw err;
   }
 
   console.log('Seeding database...');
