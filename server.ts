@@ -1430,6 +1430,7 @@ app.get('/api/orders/:id/receipt', authenticateToken, async (req, res) => {
   res.send(html);
 });
 
+
 if (process.env.NODE_ENV !== 'production') {
   import('vite').then(async ({ createServer }) => {
     const vite = await createServer({
@@ -1437,19 +1438,23 @@ if (process.env.NODE_ENV !== 'production') {
       appType: 'spa',
     });
     app.use(vite.middlewares);
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`[Dev] Server running on http://localhost:${PORT}`);
-    });
+    migrate().then(() => {
+      app.listen(PORT, '0.0.0.0', () => {
+        console.log(`[Dev] Server running on http://localhost:${PORT}`);
+      });
+    }).catch(console.error);
   });
 } else {
-  const distPath = path.join(process.cwd(), 'dist/client');
+  const distPath = require('path').join(process.cwd(), 'dist/client');
   app.use(express.static(distPath));
   app.get('*', (req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
+    res.sendFile(require('path').join(distPath, 'index.html'));
   });
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Prod] Server running on port ${PORT}`);
-  });
+  migrate().then(() => {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`[Prod] Server running on port ${PORT}`);
+    });
+  }).catch(console.error);
 }
 
 // Batch operations

@@ -1,7 +1,8 @@
-import {StrictMode} from 'react';
-import {createRoot} from 'react-dom/client';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { Analytics } from '@vercel/analytics/react';
 
 // Global fetch override to automatically prepend backend API URL if deployed separately
 // and act as a JWT interceptor
@@ -40,5 +41,6 @@ Object.defineProperty(window, 'fetch', {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
+    <Analytics />
   </StrictMode>,
 );
