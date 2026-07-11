@@ -19,19 +19,25 @@ export async function seedDatabase() {
 
   console.log('Seeding database...');
   // Add Admin
-  const adminEmail = 'admin@example.com';
+  
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  
   const existingAdmin = await db.query.users.findFirst({ where: (u, { eq }) => eq(u.email, adminEmail) });
   
   if (!existingAdmin) {
     await db.insert(schema.users).values({
       id: `usr_${uuidv4().substring(0, 8)}`,
       email: adminEmail,
-      passwordHash: await bcrypt.hash('admin123', await bcrypt.genSalt(10)),
+      passwordHash: await bcrypt.hash(adminPassword + (process.env.PASSWORD_SALT || ''), await bcrypt.genSalt(10)),
       locale: 'zh-HK',
-      status: 'active'
+      status: 'active',
+      role: 'admin',
+      permissions: ['all']
     });
-    console.log('Admin user created.');
+    console.log(`Admin user created: ${adminEmail}`);
   }
+
 
   // Categories
   const existingCategories = await db.query.categories.findMany();

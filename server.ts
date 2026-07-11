@@ -13,6 +13,38 @@ import * as schema from './src/server/schema.js';
 import { seedDatabase } from './src/server/seed.js';
 import { eq, and, or, inArray, sql, desc, gte, sum, ilike } from 'drizzle-orm';
 
+
+
+const crypto = require('crypto');
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 32) {
+  console.warn('WARNING: ENCRYPTION_KEY environment variable is missing or not 32 characters. PII encryption may fail or data may be lost across restarts. Please set ENCRYPTION_KEY in your environment.');
+}
+const ACTIVE_ENCRYPTION_KEY = ENCRYPTION_KEY || 'fallback_secret_key_32_chars_xxx'; // Use a static fallback for dev if missing, to prevent data loss across restarts
+const IV_LENGTH = 16;
+
+function encrypt(text) {
+  if (!text) return text;
+  let iv = crypto.randomBytes(IV_LENGTH);
+  let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ACTIVE_ENCRYPTION_KEY), iv);
+  let encrypted = cipher.update(text);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+function decrypt(text) {
+  if (!text) return text;
+  let textParts = text.split(':');
+  if (textParts.length !== 2) return text;
+  let iv = Buffer.from(textParts[0], 'hex');
+  let encryptedText = Buffer.from(textParts[1], 'hex');
+  let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ACTIVE_ENCRYPTION_KEY), iv);
+
+  let decrypted = decipher.update(encryptedText);
+  decrypted = Buffer.concat([decrypted, decipher.final()]);
+  return decrypted.toString();
+}
+
 const app = express();
 const PORT = 3000;
 
@@ -111,28 +143,36 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
   });
 };
 
-const authenticateAdmin = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+
+const authenticateAdmin = (req: any, res: any, next: any) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  
   if (token == null) return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Token missing' });
-
   jwt.verify(token, JWT_SECRET, async (err: any, user: any) => {
     if (err) return res.status(403).json({ code: 'FORBIDDEN', message: 'Token invalid' });
-    
-    // Check role from DB
-    const dbUser = await db.query.users.findFirst({
-      where: eq(schema.users.id, user.id)
-    });
-    
+    const dbUser = await db.query.users.findFirst({ where: eq(schema.users.id, user.id) });
     if (!dbUser || dbUser.role !== 'admin') {
       return res.status(403).json({ code: 'FORBIDDEN', message: 'Admin access required' });
     }
-    
-    (req as any).user = user;
+    req.user = dbUser;
     next();
   });
 };
+
+const requirePermission = (module: string) => {
+  return (req: any, res: any, next: any) => {
+    const user = req.user;
+    if (!user) return res.status(401).json({ code: 'UNAUTHORIZED' });
+    if (!user.permissions || !Array.isArray(user.permissions)) {
+      return res.status(403).json({ code: 'FORBIDDEN', message: 'No permissions assigned' });
+    }
+    if (!user.permissions.includes(module) && !user.permissions.includes('all')) {
+      return res.status(403).json({ code: 'FORBIDDEN', message: `Missing permission: ${module}` });
+    }
+    next();
+  };
+};
+
 
 app.use((req, res, next) => {
   console.log(`[API ${new Date().toISOString()}] ${req.method} ${req.url}`);
@@ -166,7 +206,7 @@ app.post('/api/auth/register', async (req, res) => {
       id: `usr_${uuidv4().substring(0, 8)}`,
       email,
       passwordHash,
-      phoneEncrypted: phone,
+      phoneEncrypted: encrypt(phone),
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -539,18 +579,20 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
   const orderId = `ord_${uuidv4().substring(0,8)}`;
   
   await db.transaction(async (tx) => {
-    // Check inventory
+    
+    // Check inventory and lock stock securely
     for (const item of items) {
-      const inv = await tx.query.inventory.findFirst({ where: eq(schema.inventory.skuId, item.skuId) });
-      if (!inv || inv.stock - inv.lockedStock < item.qty) {
+      const res = await tx.execute(
+        sql`UPDATE ${schema.inventory} SET locked_stock = locked_stock + ${item.qty} WHERE sku_id = ${item.skuId} AND (stock - locked_stock) >= ${item.qty} RETURNING sku_id`
+      );
+      if (res.rowCount === 0) {
         throw new Error('INSUFFICIENT_STOCK');
       }
-      await tx.update(schema.inventory)
-        .set({ lockedStock: inv.lockedStock + item.qty })
-        .where(eq(schema.inventory.skuId, item.skuId));
     }
 
 
+
+    
     const rules = await tx.query.fullReductions.findMany({ where: eq(schema.fullReductions.active, true) });
     let discountCents = 0;
     let bestExclusive = 0;
@@ -562,7 +604,15 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
     discountCents += bestExclusive;
     if (discountCents > totalCents) discountCents = totalCents;
 
-    let shippingFeeCents = (totalCents - discountCents) >= 30000 ? 0 : 3000;
+    // Get active shipping template
+    const templates = await tx.query.shippingTemplates.findMany({ where: eq(schema.shippingTemplates.active, true) });
+    const template = templates[0] || { baseFeeCents: 3000, freeShippingThresholdCents: 30000 };
+    
+    let shippingFeeCents = template.baseFeeCents;
+    if (template.freeShippingThresholdCents != null && (totalCents - discountCents) >= template.freeShippingThresholdCents) {
+      shippingFeeCents = 0;
+    }
+
     await tx.insert(schema.orders).values({
       id: orderId,
       userId,
@@ -647,25 +697,55 @@ app.post('/api/orders/:id/cancel', async (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/api/payments/:orderId/charge', async (req, res) => {
-  await db.update(schema.orders).set({ status: 'paid' }).where(eq(schema.orders.id, req.params.orderId));
-  const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.orderId) });
-  if (order) {
-    const user = await db.query.users.findFirst({ where: eq(schema.users.id, order.userId) });
-    sendTransactionalEmail(user?.email || 'admin@example.com', 'Payment Successful: ' + req.params.orderId, 'Your payment has been processed successfully.');
-  }
-  res.json({ success: true, clientSecret: 'mock_secret' });
+
+app.post('/api/payments/webhook/:method', async (req, res) => {
+  const method = req.params.method; // e.g. stripe
+  // In a real scenario, you'd verify webhook signatures here.
+  // For now, we mock the payload parsing
+  const { orderId, status, amount } = req.body;
+  if (!orderId || status !== 'success') return res.status(400).json({ error: 'Invalid payload' });
+
+  const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, orderId) });
+  if (!order || order.status !== 'pending_payment') return res.status(400).json({ error: 'Invalid order' });
+
+  await db.transaction(async (tx) => {
+    await tx.update(schema.orders).set({ status: 'paid', paymentMethod: method }).where(eq(schema.orders.id, orderId));
+    await tx.insert(schema.payments).values({
+      id: `pay_${uuidv4().substring(0,8)}`,
+      orderId,
+      method,
+      amountCents: order.grandTotalCents,
+      status: 'success'
+    });
+  });
+
+  const user = await db.query.users.findFirst({ where: eq(schema.users.id, order.userId) });
+  sendTransactionalEmail(user?.email || 'admin@example.com', 'Payment Successful: ' + orderId, 'Your payment has been processed successfully.');
+  
+  res.json({ received: true });
 });
 
-app.post('/api/payments/:orderId/voucher', async (req, res) => {
-  await db.update(schema.orders).set({ status: 'paid' }).where(eq(schema.orders.id, req.params.orderId));
-  const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.orderId) });
-  if (order) {
-    const user = await db.query.users.findFirst({ where: eq(schema.users.id, order.userId) });
-    sendTransactionalEmail(user?.email || 'admin@example.com', 'Payment Successful: ' + req.params.orderId, 'Your payment has been processed successfully.');
-  }
+app.post('/api/payments/:orderId/charge', authenticateToken, async (req, res) => {
+  // Simulate creating a payment intent and returning clientSecret
+  // Webhook will handle actual status update in a real flow. 
+  // For demo, we just return the mock secret. The frontend will pretend it succeeded and call webhook or we can just let frontend assume it paid.
+  res.json({ success: true, clientSecret: 'mock_secret_xyz' });
+});
+
+app.post('/api/payments/:orderId/voucher', authenticateToken, async (req, res) => {
+  await db.transaction(async (tx) => {
+    await tx.update(schema.orders).set({ status: 'pending_review', paymentMethod: 'bank_transfer' }).where(eq(schema.orders.id, req.params.orderId));
+    await tx.insert(schema.payments).values({
+      id: `pay_${uuidv4().substring(0,8)}`,
+      orderId: req.params.orderId,
+      method: 'bank_transfer',
+      amountCents: 0, // not verified yet
+      status: 'pending'
+    });
+  });
   res.json({ success: true });
 });
+
 
 app.get('/api/faqs', async (req, res) => {
   const list = await db.query.faqs.findMany({ orderBy: schema.faqs.sort });
@@ -726,7 +806,7 @@ app.get('/api/admin/stats', authenticateAdmin, async (req, res) => {
   });
 });
 
-app.get('/api/admin/products', authenticateAdmin, async (req, res) => {
+app.get('/api/admin/products', authenticateAdmin, requirePermission('products'), async (req, res) => {
   const prods = await db.query.products.findMany({ orderBy: [desc(schema.products.createdAt)] });
   const allSpecs = await db.query.productSpecs.findMany();
   const allInv = await db.query.inventory.findMany();
@@ -747,7 +827,7 @@ app.get('/api/admin/products', authenticateAdmin, async (req, res) => {
   res.json(result);
 });
 
-app.post('/api/admin/products', authenticateAdmin, async (req, res) => {
+app.post('/api/admin/products', authenticateAdmin, requirePermission('products'), async (req, res) => {
   const data = req.body;
   const id = `prod_${uuidv4().substring(0,8)}`;
   await db.insert(schema.products).values({
@@ -772,7 +852,8 @@ app.patch('/api/admin/inventory/:skuId', authenticateAdmin, async (req, res) => 
   res.json({ success: true });
 });
 
-app.get('/api/admin/orders', authenticateAdmin, async (req, res) => {
+
+app.get('/api/admin/orders', authenticateAdmin, requirePermission('orders'), async (req, res) => {
   const list = await db.query.orders.findMany({ orderBy: [desc(schema.orders.createdAt)] });
   
   const formatted = [];
@@ -784,30 +865,98 @@ app.get('/api/admin/orders', authenticateAdmin, async (req, res) => {
       userEmail: user?.email || 'Unknown',
       totalCents: order.grandTotalCents,
       status: order.status,
-      paymentStatus: order.status === 'pending_payment' ? 'pending' : 'paid',
-      shippingMethod: 'Standard',
+      paymentStatus: order.status === 'pending_review' ? 'pending_review' : (order.status === 'pending_payment' ? 'pending' : 'paid'),
+      shippingMethod: order.paymentMethod === 'bank_transfer' ? 'Bank Transfer' : 'Standard',
       trackingNo: order.remark || '',
       createdAt: order.createdAt
     });
   }
-  
   res.json(formatted);
 });
 
-app.post('/api/admin/orders/:id/ship', authenticateAdmin, async (req, res) => {
+
+app.post('/api/admin/orders/:id/ship', authenticateAdmin, requirePermission('orders'), async (req, res) => {
   await db.update(schema.orders).set({ status: 'shipped', remark: req.body.trackingNo }).where(eq(schema.orders.id, req.params.id));
   res.json({ success: true });
 });
 
-app.patch('/api/admin/orders/:id/price', authenticateAdmin, async (req, res) => {
-  await db.update(schema.orders).set({ grandTotalCents: req.body.grandTotalCents }).where(eq(schema.orders.id, req.params.id));
+
+
+
+app.patch('/api/admin/orders/:id/price', authenticateAdmin, requirePermission('orders'), async (req, res) => {
+  const adminId = (req as any).user.id;
+  await db.transaction(async (tx) => {
+    const order = await tx.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+    if (!order) throw new Error('Order not found');
+    await tx.update(schema.orders).set({ grandTotalCents: req.body.grandTotalCents }).where(eq(schema.orders.id, req.params.id));
+    await tx.insert(schema.auditLogs).values({
+      id: `aud_${uuidv4().substring(0,8)}`,
+      adminId,
+      action: `Modified price of order ${req.params.id} from ${order.grandTotalCents} to ${req.body.grandTotalCents}`,
+      resource: 'orders'
+    });
+  });
   res.json({ success: true });
 });
 
-app.post('/api/admin/orders/:id/close', authenticateAdmin, async (req, res) => {
-  await db.update(schema.orders).set({ status: 'cancelled' }).where(eq(schema.orders.id, req.params.id));
+app.post('/api/admin/orders/:id/close', authenticateAdmin, requirePermission('orders'), async (req, res) => {
+  await db.transaction(async (tx) => {
+    const order = await tx.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+    if (!order) throw new Error('Order not found');
+    await tx.update(schema.orders).set({ status: 'cancelled' }).where(eq(schema.orders.id, req.params.id));
+    
+    // Release inventory locks
+    const orderItemsList = await tx.query.orderItems.findMany({ where: eq(schema.orderItems.orderId, req.params.id) });
+    for (const item of orderItemsList) {
+      await tx.execute(
+        sql`UPDATE ${schema.inventory} SET locked_stock = GREATEST(0, locked_stock - ${item.qty}) WHERE sku_id = ${item.skuId}`
+      );
+    }
+  });
   res.json({ success: true });
 });
+
+
+app.get('/api/admin/payments/review-queue', authenticateAdmin, requirePermission('orders'), async (req, res) => {
+  const pendingOrders = await db.query.orders.findMany({
+    where: eq(schema.orders.status, 'pending_review'),
+    orderBy: [desc(schema.orders.createdAt)],
+    with: { user: true }
+  });
+  // Decrypt sensitive
+  pendingOrders.forEach((o: any) => {
+    o.addressPhone = decrypt(o.addressPhone);
+    o.addressDetail = decrypt(o.addressDetail);
+    if (o.user) o.user.phoneEncrypted = decrypt(o.user.phoneEncrypted);
+  });
+  res.json({ success: true, queue: pendingOrders });
+});
+
+app.post('/api/admin/orders/:id/approve-payment', authenticateAdmin, requirePermission('orders'), async (req, res) => {
+  await db.transaction(async (tx) => {
+    const order = await tx.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+    if (!order) throw new Error('Order not found');
+    await tx.update(schema.orders).set({ status: 'paid' }).where(eq(schema.orders.id, req.params.id));
+    await tx.update(schema.payments).set({ status: 'success' }).where(eq(schema.payments.orderId, req.params.id));
+  });
+  res.json({ success: true });
+});
+
+app.post('/api/admin/orders/:id/reject-payment', authenticateAdmin, requirePermission('orders'), async (req, res) => {
+  await db.transaction(async (tx) => {
+    const order = await tx.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+    if (!order) throw new Error('Order not found');
+    await tx.update(schema.orders).set({ status: 'pending_payment' }).where(eq(schema.orders.id, req.params.id));
+    await tx.update(schema.payments).set({ status: 'failed' }).where(eq(schema.payments.orderId, req.params.id));
+  });
+  res.json({ success: true });
+});
+
+app.post('/api/admin/orders/:id/remark', authenticateAdmin, requirePermission('orders'), async (req, res) => {
+  await db.update(schema.orders).set({ remark: req.body.remark }).where(eq(schema.orders.id, req.params.id));
+  res.json({ success: true });
+});
+
 
 app.get('/api/admin/feedbacks', authenticateAdmin, async (req, res) => {
   const list = await db.query.feedbacks.findMany({ orderBy: [desc(schema.feedbacks.createdAt)] });
@@ -877,122 +1026,6 @@ app.post('/api/admin/reductions', authenticateAdmin, async (req, res) => {
 
 
 // Database initialization endpoint via curl
-// Example: curl -X POST http://localhost:3000/api/admin/init-db
-// Cloudflare R2 Configuration
-const s3 = new S3Client({
-  region: "auto",
-  endpoint: process.env.R2_ACCOUNT_ID ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : '',
-  credentials: {
-accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
-secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
-  },
-});
-
-const storage = multerS3({
-  s3: s3,
-  bucket: process.env.R2_BUCKET_NAME || 'my-bucket',
-  acl: 'public-read',
-  contentType: multerS3.AUTO_CONTENT_TYPE,
-  key: function (req, file, cb) {
-const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-const extension = path.extname(file.originalname);
-cb(null, 'assets/' + uniqueSuffix + extension);
-  }
-});
-
-const upload = multer({ storage: process.env.R2_ACCESS_KEY_ID ? storage : multer.memoryStorage() });
-
-app.post('/api/admin/upload', authenticateAdmin, upload.single('file'), (req, res) => {
-  if (process.env.R2_ACCESS_KEY_ID && req.file) {
- // The multer-s3 location might be a direct R2 URL, or we construct a public one
- // R2 public bucket URL needs to be configured in Cloudflare Dashboard
- const fileKey = (req.file as any).key;
- const publicUrl = process.env.R2_PUBLIC_URL 
-   ? `${process.env.R2_PUBLIC_URL}/${fileKey}`
-   : (req.file as any).location; // Fallback to S3 URL
-   
- res.json({ url: publicUrl });
-  } else {
- // Mock for dev mode
- res.json({ url: 'https://placehold.co/600x400?text=Mock+Upload' });
-  }
-});
-
-app.post('/api/admin/init-db', async (req, res) => {
-  try {
-await seedDatabase();
-res.json({ success: true, message: 'Database initialized successfully via API.' });
-  } catch (error: any) {
-console.error('Initialization error:', error);
-res.status(500).json({ success: false, message: 'Failed to initialize database', error: error.message });
-  }
-});
-
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Unhandled Server Error:', err.message);
-  // Send empty array fallback for list queries to prevent UI crashes
-  if (req.method === 'GET') {
-    return res.json([]);
-  }
-  res.status(500).json({ success: false, error: 'Internal Server Error', message: err.message });
-});
-
-
-if (process.env.NODE_ENV !== 'production') {
-
-  createViteServer({
-    server: { middlewareMode: true },
-    appType: 'spa',
-  }).then(vite => {
-    app.use(vite.middlewares);
-    
-// Database initialization endpoint via curl
-// Example: curl -X POST http://localhost:3000/api/admin/init-db
-
-
-
-
-
-// Cloudflare R2 Configuration
-const s3 = new S3Client({
-  region: "auto",
-  endpoint: process.env.R2_ACCOUNT_ID ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : '',
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
-  },
-});
-
-const storage = multerS3({
-  s3: s3,
-  bucket: process.env.R2_BUCKET_NAME || 'my-bucket',
-  acl: 'public-read',
-  contentType: multerS3.AUTO_CONTENT_TYPE,
-  key: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const extension = path.extname(file.originalname);
-    cb(null, 'assets/' + uniqueSuffix + extension);
-  }
-});
-
-const upload = multer({ storage: process.env.R2_ACCESS_KEY_ID ? storage : multer.memoryStorage() });
-
-app.post('/api/admin/upload', authenticateAdmin, upload.single('file'), (req, res) => {
-  if (process.env.R2_ACCESS_KEY_ID && req.file) {
-     // The multer-s3 location might be a direct R2 URL, or we construct a public one
-     // R2 public bucket URL needs to be configured in Cloudflare Dashboard
-     const fileKey = (req.file as any).key;
-     const publicUrl = process.env.R2_PUBLIC_URL 
-       ? `${process.env.R2_PUBLIC_URL}/${fileKey}`
-       : (req.file as any).location; // Fallback to S3 URL
-       
-     res.json({ url: publicUrl });
-  } else {
-     // Mock for dev mode
-     res.json({ url: 'https://placehold.co/600x400?text=Mock+Upload' });
-  }
-});
-
 app.post('/api/admin/init-db', async (req, res) => {
   try {
     await seedDatabase();
@@ -1003,7 +1036,132 @@ app.post('/api/admin/init-db', async (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('Unhandled Server Error:', err.message);
+  if (req.method === 'GET') {
+    return res.json([]);
+  }
+  res.status(500).json({ success: false, error: 'Internal Server Error', message: err.message });
+});
+
+// Cron Jobs
+setInterval(async () => {
+  try {
+    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
+        const expiredOrders = await db.query.orders.findMany({
+      where: and(
+        eq(schema.orders.status, 'pending_payment'),
+        sql`created_at < ${thirtyMinsAgo}`
+      )
+    });
+    
+    for (const order of expiredOrders) {
+      await db.transaction(async (tx) => {
+        await tx.update(schema.orders).set({ status: 'cancelled' }).where(eq(schema.orders.id, order.id));
+        const orderItems = await tx.query.orderItems.findMany({ where: eq(schema.orderItems.orderId, order.id) });
+        for (const item of orderItems) {
+          await tx.execute(
+            sql`UPDATE ${schema.inventory} SET locked_stock = GREATEST(0, locked_stock - ${item.qty}) WHERE sku_id = ${item.skuId}`
+          );
+        }
+      });
+      console.log(`[Cron] Cancelled order ${order.id} due to timeout`);
+    }
+    
+    // Clean old carts (7 days)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const oldCarts = await db.query.carts.findMany({
+      where: sql`updated_at < ${sevenDaysAgo}`
+    });
+    for (const cart of oldCarts) {
+      await db.delete(schema.cartItems).where(eq(schema.cartItems.cartId, cart.id));
+    }
+  } catch (err) {
+    console.error('[Cron] Error running jobs', err);
+  }
+}, 60 * 1000);
+
+
+
+// Addresses CRUD
+app.get('/api/addresses', authenticateToken, async (req, res) => {
+  const userId = (req as any).user.id;
+  try {
+    const list = await db.query.addresses.findMany({ where: eq(schema.addresses.userId, userId) });
+    list.forEach(a => {
+      a.phone = decrypt(a.phone);
+      a.detail = decrypt(a.detail);
+    });
+    res.json({ success: true, addresses: list });
+  } catch (error) {
+    res.status(500).json({ code: 'SERVER_ERROR' });
+  }
+});
+
+app.post('/api/addresses', authenticateToken, async (req, res) => {
+  const userId = (req as any).user.id;
+  try {
+    const { recipient, phone, detail, isDefault } = req.body;
+    if (isDefault) {
+      await db.update(schema.addresses)
+        .set({ isDefault: false })
+        .where(eq(schema.addresses.userId, userId));
+    }
+    const newId = `addr_${uuidv4().substring(0,8)}`;
+    await db.insert(schema.addresses).values({
+      id: newId,
+      userId,
+      recipient,
+      phone: encrypt(phone),
+      detail: encrypt(detail),
+      isDefault: isDefault || false
+    });
+    res.json({ success: true, id: newId });
+  } catch (error) {
+    res.status(500).json({ code: 'SERVER_ERROR' });
+  }
+});
+
+app.patch('/api/addresses/:id', authenticateToken, async (req, res) => {
+  const userId = (req as any).user.id;
+  try {
+    const { recipient, phone, detail, isDefault } = req.body;
+    if (isDefault) {
+      await db.update(schema.addresses)
+        .set({ isDefault: false })
+        .where(eq(schema.addresses.userId, userId));
+    }
+    const updateData: any = {};
+    if (recipient) updateData.recipient = recipient;
+    if (phone) updateData.phone = encrypt(phone);
+    if (detail) updateData.detail = encrypt(detail);
+    if (isDefault !== undefined) updateData.isDefault = isDefault;
+    
+    await db.update(schema.addresses).set(updateData).where(and(eq(schema.addresses.id, req.params.id), eq(schema.addresses.userId, userId)));
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ code: 'SERVER_ERROR' });
+  }
+});
+
+app.delete('/api/addresses/:id', authenticateToken, async (req, res) => {
+  const userId = (req as any).user.id;
+  try {
+    await db.delete(schema.addresses).where(and(eq(schema.addresses.id, req.params.id), eq(schema.addresses.userId, userId)));
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ code: 'SERVER_ERROR' });
+  }
+});
+
+if (process.env.NODE_ENV !== 'production') {
+  import('vite').then(async ({ createServer }) => {
+    const vite = await createServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`[Dev] Server running on http://localhost:${PORT}`);
     });
   });

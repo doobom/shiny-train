@@ -1,4 +1,6 @@
-import { fetchWithAuth as apiFetch } from '../../utils/api';
+const fs = require('fs');
+
+const code = `import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, PlusCircle, AlertTriangle, Edit, RefreshCw, BadgeCheck, Trash2, Tag, Layers, CheckSquare } from 'lucide-react';
 import { Locale, Category } from '../../types/index.ts';
@@ -73,7 +75,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
       const token = localStorage.getItem('jwt_token');
       const res = await apiFetch('/api/admin/upload', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { 'Authorization': \`Bearer \${token}\` },
         body: formData
       });
       const data = await res.json();
@@ -108,7 +110,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
   };
 
   const handleUpdateStock = (skuId: string) => {
-    apiFetch(`/api/admin/inventory/${skuId}`, {
+    apiFetch(\`/api/admin/inventory/\${skuId}\`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stock: quickStock, warnThreshold: quickThreshold })
@@ -124,7 +126,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
 
   const toggleShelf = (id: string, currentStatus: string) => {
     const nextStatus = currentStatus === 'on_shelf' ? 'off_shelf' : 'on_shelf';
-    apiFetch(`/api/admin/products/${id}/status`, {
+    apiFetch(\`/api/admin/products/\${id}/status\`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: nextStatus })
@@ -163,7 +165,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
 
   const handleDeleteCategory = (id: string) => {
     if (!confirm('Are you sure?')) return;
-    apiFetch(`/api/admin/categories/${id}`, { method: 'DELETE' }).then(() => fetchCatalog());
+    apiFetch(\`/api/admin/categories/\${id}\`, { method: 'DELETE' }).then(() => fetchCatalog());
   };
 
   if (loading) return <div className="p-10 text-center">Loading...</div>;
@@ -188,19 +190,19 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
       <div className="flex gap-2">
         <button 
           onClick={() => setActiveTab('products')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'products' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          className={\`px-4 py-2 text-xs font-bold rounded-lg transition-colors \${activeTab === 'products' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}\`}
         >
           <Tag className="inline-block w-3.5 h-3.5 mr-1" /> {locale === 'zh-HK' ? '商品列表' : 'Products'}
         </button>
         <button 
           onClick={() => setActiveTab('categories')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'categories' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          className={\`px-4 py-2 text-xs font-bold rounded-lg transition-colors \${activeTab === 'categories' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}\`}
         >
           <Layers className="inline-block w-3.5 h-3.5 mr-1" /> {locale === 'zh-HK' ? '類目設置' : 'Categories'}
         </button>
         <button 
           onClick={() => setActiveTab('warnings')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'warnings' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600'}`}
+          className={\`px-4 py-2 text-xs font-bold rounded-lg transition-colors \${activeTab === 'warnings' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600'}\`}
         >
           <AlertTriangle className="inline-block w-3.5 h-3.5 mr-1" /> {locale === 'zh-HK' ? '庫存預警' : 'Stock Alerts'} 
           {warnings.length > 0 && <span className="ml-1.5 bg-white text-red-600 px-1.5 py-0.5 rounded-full text-[9px]">{warnings.length}</span>}
@@ -234,42 +236,6 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
               {locale === 'zh-HK' ? '發布新商品' : 'Add Product'}
             </button>
           </div>
-
-          
-          {showAddForm && (
-            <form onSubmit={handleCreateProduct} className="bg-gray-50 p-5 rounded-2xl border border-gray-200 mb-4 space-y-4 animate-fade-in">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Product Name (ZH)</label>
-                  <input type="text" required value={nameZh} onChange={e=>setNameZh(e.target.value)} className="w-full border p-2 rounded text-xs" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Product Name (EN)</label>
-                  <input type="text" required value={nameEn} onChange={e=>setNameEn(e.target.value)} className="w-full border p-2 rounded text-xs" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Category</label>
-                  <select value={categoryId} onChange={e=>setCategoryId(e.target.value)} className="w-full border p-2 rounded text-xs bg-white">
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.nameZh}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Image URL (or upload)</label>
-                  <div className="flex gap-2">
-                    <input type="text" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className="flex-1 border p-2 rounded text-xs" />
-                    <label className="cursor-pointer bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded text-xs font-bold flex items-center">
-                      {isUploading ? '...' : 'Upload'}
-                      <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
-                    </label>
-                  </div>
-                </div>
-              </div>
-              <div className="border-t border-gray-200 pt-4 flex justify-end gap-2">
-                <button type="button" onClick={() => setShowAddForm(false)} className="px-4 py-2 text-xs font-bold border rounded-lg text-gray-600">Cancel</button>
-                <button type="submit" className="px-4 py-2 text-xs font-bold bg-gray-900 text-white rounded-lg">Publish</button>
-              </div>
-            </form>
-          )}
 
           {/* Quick Stock Edit */}
           {editingSkuId && (
@@ -327,7 +293,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
                     </td>
                     <td className="p-4 max-w-xs truncate">
                       <span className="font-bold text-gray-950 block">{locale === 'zh-HK' ? prod.nameZh : prod.nameEn}</span>
-                      <span className="text-[10px] text-gray-400">HK${(prod.priceAfterCents/100).toFixed(2)}</span>
+                      <span className="text-[10px] text-gray-400">HK\${(prod.priceAfterCents/100).toFixed(2)}</span>
                     </td>
                     <td className="p-4 text-gray-500 font-bold">
                       {categories.find(c => c.id === prod.categoryId)?.nameZh || 'Direct'}
@@ -345,7 +311,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
                       ))}
                     </td>
                     <td className="p-4">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${prod.status === 'on_shelf' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                      <span className={\`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold \${prod.status === 'on_shelf' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}\`}>
                         {prod.status === 'on_shelf' ? (locale==='zh-HK'?'已上架':'Active') : (locale==='zh-HK'?'未上架':'Hidden')}
                       </span>
                     </td>
@@ -432,3 +398,6 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
     </div>
   );
 }
+`;
+
+fs.writeFileSync('src/components/admin/AdminProducts.tsx', code);

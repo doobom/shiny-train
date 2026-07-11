@@ -73,7 +73,7 @@ export default function AdminOrders({ locale }: AdminOrdersProps) {
   };
 
   const handleApprovePayment = (orderId: string) => {
-    apiFetch(`/api/admin/payments/${orderId}/approve`, { method: 'POST' })
+    apiFetch(`/api/admin/orders/${orderId}/approve-payment`, { method: 'POST' })
       .then(res => res.json())
       .then(() => {
         setNotif(locale === 'zh-HK' ? '匯款憑證審核通過，訂單已確認。' : 'Bank transfer approved. Stock released.');
@@ -83,7 +83,7 @@ export default function AdminOrders({ locale }: AdminOrdersProps) {
   };
 
   const handleRejectPayment = (orderId: string) => {
-    apiFetch(`/api/admin/payments/${orderId}/reject`, { method: 'POST' })
+    apiFetch(`/api/admin/orders/${orderId}/reject-payment`, { method: 'POST' })
       .then(res => res.json())
       .then(() => {
         setNotif(locale === 'zh-HK' ? '已駁回匯款憑證，已通知顧客重傳。' : 'Bank transfer rejected.');
