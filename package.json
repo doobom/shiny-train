@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "sed -i 's/^NODE_ENV=.*$//g' .env 2>/dev/null || true && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "sed -i 's/^NODE_ENV=.*$//g' .env 2>/dev/null || true  && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist data.json",
     "lint": "tsc --noEmit"

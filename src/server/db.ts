@@ -10,7 +10,7 @@ import { migrate as migrateNodePg } from 'drizzle-orm/node-postgres/migrator';
 let db: any;
 let migrate: () => Promise<void>;
 
-if (process.env.NODE_ENV === '' && process.env.DATABASE_URL) {
+if (!process.env.NODE_ENV && process.env.DATABASE_URL) {
   // Production with PostgreSQL
   const url = process.env.DATABASE_URL;
   const regex = /^postgresql:\/\/(.*?):(.*?)@(.*?):(\d+)\/(.*)$/;
