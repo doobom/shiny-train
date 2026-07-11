@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from './utils/api';
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, User, Shield, HelpCircle, LogIn, LogOut, CheckCircle, Store, Layers } from 'lucide-react';
 import { Locale } from './types/index.ts';
@@ -18,9 +19,10 @@ import AdminOrders from './components/admin/AdminOrders.tsx';
 import AdminMarketing from './components/admin/AdminMarketing.tsx';
 import AdminFeedback from './components/admin/AdminFeedback.tsx';
 import AdminSettings from './components/admin/AdminSettings.tsx';
+import AdminUsers from './components/admin/AdminUsers.tsx';
 
 type ViewState = 'shop_home' | 'product_detail' | 'cart' | 'checkout' | 'payment' | 'profile';
-type AdminTab = 'dashboard' | 'products' | 'orders' | 'marketing' | 'feedback' | 'settings';
+type AdminTab = 'dashboard' | 'products' | 'orders' | 'marketing' | 'feedback' | 'settings' | 'users';
 
 export default function App() {
   const [locale, setLocale] = useState<Locale>('zh-HK');
@@ -55,11 +57,18 @@ export default function App() {
 
   const handleLoginSuccess = (token: string, user: any) => {
     localStorage.setItem('jwt_token', token);
+    localStorage.setItem('token', token); // For UserProfile
     localStorage.setItem('user_id', user.id);
     localStorage.setItem('user_email', user.email);
+    localStorage.setItem('user', JSON.stringify(user));
     setUserId(user.id);
     setUserEmail(user.email);
     setTokenReady(true);
+    
+    // Automatically switch to admin mode if the user is an admin and appMode isn't strictly 'user'
+    if (user.role === 'admin' && appMode !== 'user') {
+      setIsAdminMode(true);
+    }
   };
   
   const handleLogout = () => {
@@ -74,7 +83,7 @@ export default function App() {
 
   const fetchCartCount = () => {
     if (!tokenReady) return;
-    fetch(`/api/cart/${userId}`)
+    apiFetch(`/api/cart/${userId}`)
       .then(res => res.json())
       .then(data => {
         const total = (data || []).reduce((sum: number, item: any) => sum + item.qty, 0);
@@ -188,6 +197,15 @@ export default function App() {
                 <span className="hidden sm:inline">{locale === 'zh-HK' ? '登入' : 'Login'}</span>
               </button>
             )}
+            {tokenReady && JSON.parse(localStorage.getItem('user') || '{}')?.role === 'admin' && !isAdminMode && (
+              <button
+                onClick={() => setIsAdminMode(true)}
+                className="font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 text-gray-500 hover:text-gray-950"
+              >
+                <Shield className="h-4 w-4" />
+                <span className="hidden sm:inline">{dict.adminConsole}</span>
+              </button>
+            )}
             <button
               onClick={toggleLanguage}
               className="border border-gray-200 hover:border-neutral-950 hover:bg-gray-50 text-neutral-800 font-bold px-3 py-2 rounded-xl text-xs transition-colors"
@@ -280,7 +298,7 @@ export default function App() {
                   fetchCartCount();
                 }}
                 onInstantBuy={(skuId, qty) => {
-                  fetch('/api/cart', {
+                  apiFetch('/api/cart', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, skuId, qty })
@@ -347,7 +365,8 @@ export default function App() {
                   { id: 'orders', label: locale === 'zh-HK' ? '訂單履約' : 'Fulfillment' },
                   { id: 'marketing', label: locale === 'zh-HK' ? '行銷與滿減' : 'Promotions' },
                   { id: 'feedback', label: locale === 'zh-HK' ? '客服售後' : 'Support Tickets' },
-                  { id: 'settings', label: locale === 'zh-HK' ? '參數與設定' : 'Settings & PITR' }
+                  { id: 'settings', label: locale === 'zh-HK' ? '參數與設定' : 'Settings & PITR' },
+                  { id: 'users', label: locale === 'zh-HK' ? '用戶權限' : 'Users & Roles' }
                 ].map(item => (
                   <button
                     key={item.id}
@@ -372,6 +391,7 @@ export default function App() {
               {activeAdminTab === 'marketing' && <AdminMarketing locale={locale} />}
               {activeAdminTab === 'feedback' && <AdminFeedback locale={locale} />}
               {activeAdminTab === 'settings' && <AdminSettings locale={locale} />}
+              {activeAdminTab === 'users' && <AdminUsers locale={locale} />}
             </div>
           </div>
         )}

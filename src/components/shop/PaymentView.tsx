@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { CreditCard, BadgeCheck, Clock, FileText, Upload, RefreshCw } from 'lucide-react';
 import { Locale } from '../../types/index.ts';
@@ -16,7 +17,7 @@ export default function PaymentView({ orderId, locale, onPaymentSuccess }: Payme
   const [status, setStatus] = useState<string>('pending');
 
   const fetchOrder = () => {
-    fetch(`/api/orders/${orderId}`)
+    apiFetch(`/api/orders/${orderId}`)
       .then(res => res.json())
       .then(data => {
         setOrder(data);
@@ -35,7 +36,7 @@ export default function PaymentView({ orderId, locale, onPaymentSuccess }: Payme
 
     // Auto polling for payment updates
     const timer = setInterval(() => {
-      fetch(`/api/payments/${orderId}/poll`)
+      apiFetch(`/api/payments/${orderId}/poll`)
         .then(res => res.json())
         .then(data => {
           if (data.status === 'paid') {
@@ -53,7 +54,7 @@ export default function PaymentView({ orderId, locale, onPaymentSuccess }: Payme
 
   const triggerInstantPayment = () => {
     // Simulated instant success for online channels (FPS / PayMe / AlipayHK)
-    fetch(`/api/payments/${orderId}/charge`, {
+    apiFetch(`/api/payments/${orderId}/charge`, {
       method: 'POST'
     })
     .then(res => res.json())
@@ -65,7 +66,7 @@ export default function PaymentView({ orderId, locale, onPaymentSuccess }: Payme
     setUploading(true);
     setTimeout(() => {
       const mockUrl = `https://api.apcube.com/receipts/mock_voucher_${Date.now()}.png`;
-      fetch(`/api/payments/${orderId}/voucher`, {
+      apiFetch(`/api/payments/${orderId}/voucher`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ voucherUrl: mockUrl })

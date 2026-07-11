@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { FileText, Search, Truck, DollarSign, Ban, Check, X, ShieldAlert, Edit } from 'lucide-react';
 import { Locale } from '../../types/index.ts';
@@ -24,7 +25,7 @@ export default function AdminOrders({ locale }: AdminOrdersProps) {
 
   const fetchOrders = () => {
     setLoading(true);
-    fetch('/api/admin/orders')
+    apiFetch('/api/admin/orders')
       .then(res => res.json())
       .then(data => {
         setOrders(data);
@@ -38,7 +39,7 @@ export default function AdminOrders({ locale }: AdminOrdersProps) {
 
   const handleShip = (orderId: string) => {
     if (!trackingNo) return;
-    fetch(`/api/admin/orders/${orderId}/ship`, {
+    apiFetch(`/api/admin/orders/${orderId}/ship`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ trackingNo })
@@ -54,7 +55,7 @@ export default function AdminOrders({ locale }: AdminOrdersProps) {
   };
 
   const handleAdjustPrice = (orderId: string) => {
-    fetch(`/api/admin/orders/${orderId}/price`, {
+    apiFetch(`/api/admin/orders/${orderId}/price`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -72,7 +73,7 @@ export default function AdminOrders({ locale }: AdminOrdersProps) {
   };
 
   const handleApprovePayment = (orderId: string) => {
-    fetch(`/api/admin/payments/${orderId}/approve`, { method: 'POST' })
+    apiFetch(`/api/admin/payments/${orderId}/approve`, { method: 'POST' })
       .then(res => res.json())
       .then(() => {
         setNotif(locale === 'zh-HK' ? '匯款憑證審核通過，訂單已確認。' : 'Bank transfer approved. Stock released.');
@@ -82,7 +83,7 @@ export default function AdminOrders({ locale }: AdminOrdersProps) {
   };
 
   const handleRejectPayment = (orderId: string) => {
-    fetch(`/api/admin/payments/${orderId}/reject`, { method: 'POST' })
+    apiFetch(`/api/admin/payments/${orderId}/reject`, { method: 'POST' })
       .then(res => res.json())
       .then(() => {
         setNotif(locale === 'zh-HK' ? '已駁回匯款憑證，已通知顧客重傳。' : 'Bank transfer rejected.');
@@ -92,7 +93,7 @@ export default function AdminOrders({ locale }: AdminOrdersProps) {
   };
 
   const handleCloseOrder = (orderId: string) => {
-    fetch(`/api/admin/orders/${orderId}/close`, { method: 'POST' })
+    apiFetch(`/api/admin/orders/${orderId}/close`, { method: 'POST' })
       .then(res => res.json())
       .then(() => {
         setNotif(locale === 'zh-HK' ? '訂單已關閉，鎖定庫存已釋放。' : 'Order closed. Stock released.');

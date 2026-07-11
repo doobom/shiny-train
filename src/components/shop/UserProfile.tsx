@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { FileText, Search, PlusCircle, HelpCircle, AlertCircle, RefreshCw, Truck, BadgeCheck } from 'lucide-react';
 import { Locale, Order, Feedback, FAQ } from '../../types/index.ts';
@@ -8,7 +9,11 @@ interface UserProfileProps {
 }
 
 export default function UserProfile({ userId, locale }: UserProfileProps) {
-  const [activeTab, setActiveTab] = useState<'orders' | 'tickets' | 'faqs'>('orders');
+  const token = localStorage.getItem('token') || '';
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'tickets' | 'faqs'>('profile');
+  const [profileForm, setProfileForm] = useState({ oldPassword: '', newPassword: '', addressRecipient: '', addressPhone: '', addressDetail: '' });
+  const [profileMessage, setProfileMessage] = useState('');
   const [orders, setOrders] = useState<any[]>([]);
   const [tickets, setTickets] = useState<Feedback[]>([]);
   const [faqs, setFaqs] = useState<FAQ[]>([]);
@@ -26,9 +31,9 @@ export default function UserProfile({ userId, locale }: UserProfileProps) {
   const fetchUserData = () => {
     setLoading(true);
     Promise.all([
-      fetch(`/api/orders/mine/${userId}`).then(res => res.json()),
-      fetch(`/api/feedbacks/mine/${userId}`).then(res => res.json()),
-      fetch('/api/faqs').then(res => res.json())
+      apiFetch(`/api/orders/mine/${userId}`, { headers: { Authorization: `Bearer ${token}` } }).then(res => res.json()),
+      apiFetch(`/api/feedbacks/mine/${userId}`, { headers: { Authorization: `Bearer ${token}` } }).then(res => res.json()),
+      apiFetch('/api/faqs', { headers: { Authorization: `Bearer ${token}` } }).then(res => res.json())
     ])
     .then(([ordersData, ticketsData, faqsData]) => {
       setOrders(ordersData);
@@ -47,14 +52,14 @@ export default function UserProfile({ userId, locale }: UserProfileProps) {
   }, [userId]);
 
   const handleConfirmReceipt = (orderId: string) => {
-    fetch(`/api/orders/${orderId}/confirm-receipt`, { method: 'POST' })
+    apiFetch(`/api/orders/${orderId}/confirm-receipt`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
       .then(res => res.json())
       .then(() => fetchUserData())
       .catch(e => console.error(e));
   };
 
   const handleCancelOrder = (orderId: string) => {
-    fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' })
+    apiFetch(`/api/orders/${orderId}/cancel`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
       .then(res => res.json())
       .then(() => fetchUserData())
       .catch(e => console.error(e));
@@ -64,9 +69,12 @@ export default function UserProfile({ userId, locale }: UserProfileProps) {
     e.preventDefault();
     if (!ticketContent) return;
 
-    fetch('/api/feedbacks', {
+    apiFetch('/api/feedbacks', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
       body: JSON.stringify({
         userId,
         type: ticketType,
@@ -182,6 +190,115 @@ export default function UserProfile({ userId, locale }: UserProfileProps) {
       </div>
 
       {/* Orders log view */}
+      {activeTab === 'profile' && (
+        <div className="bg-white p-5 rounded-xl border border-gray-150 space-y-6">
+          <div>
+            <h3 className="text-sm font-bold text-gray-950 font-display mb-1">{locale === 'zh-HK' ? '帳戶資料' : 'Account Details'}</h3>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                <span className="text-[10px] text-gray-400 uppercase font-semibold block">{locale === 'zh-HK' ? '電郵地址' : 'Email'}</span>
+                <span className="text-xs font-bold text-gray-900">{user?.email}</span>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                <span className="text-[10px] text-gray-400 uppercase font-semibold block">{locale === 'zh-HK' ? '會員等級' : 'Membership Tier'}</span>
+                <span className="text-xs font-bold text-amber-600 uppercase">{(user as any)?.tier || 'STANDARD'}</span>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                <span className="text-[10px] text-gray-400 uppercase font-semibold block">{locale === 'zh-HK' ? '權限' : 'Role'}</span>
+                <span className="text-xs font-bold text-emerald-600 uppercase">{(user as any)?.role || 'CUSTOMER'}</span>
+              </div>
+            </div>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                const res = await apiFetch('/api/user/profile', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ addressRecipient: profileForm.addressRecipient, addressPhone: profileForm.addressPhone, addressDetail: profileForm.addressDetail })
+                });
+                const data = await res.json();
+                if (data.success) {
+                  setProfileMessage(locale === 'zh-HK' ? '資料更新成功' : 'Profile updated successfully');
+                }
+              } catch (err) {}
+            }} className="max-w-sm space-y-4 mt-6">
+              <h4 className="text-xs font-bold text-gray-900">{locale === 'zh-HK' ? '收貨資料' : 'Shipping Details'}</h4>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">{locale === 'zh-HK' ? '收貨人姓名' : 'Recipient Name'}</label>
+                <input type="text" value={profileForm.addressRecipient} onChange={e => setProfileForm(p => ({...p, addressRecipient: e.target.value}))} className="w-full border border-gray-250 p-2.5 rounded-lg text-xs mt-1 focus:outline-none" />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">{locale === 'zh-HK' ? '聯絡電話' : 'Phone'}</label>
+                <input type="text" value={profileForm.addressPhone} onChange={e => setProfileForm(p => ({...p, addressPhone: e.target.value}))} className="w-full border border-gray-250 p-2.5 rounded-lg text-xs mt-1 focus:outline-none" />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">{locale === 'zh-HK' ? '詳細地址' : 'Address'}</label>
+                <textarea rows={3} value={profileForm.addressDetail} onChange={e => setProfileForm(p => ({...p, addressDetail: e.target.value}))} className="w-full border border-gray-250 p-2.5 rounded-lg text-xs mt-1 focus:outline-none" />
+              </div>
+              <button type="submit" className="bg-neutral-900 hover:bg-neutral-800 text-white font-bold px-4 py-2 rounded-lg text-xs transition-colors">
+                {locale === 'zh-HK' ? '儲存資料' : 'Save Profile'}
+              </button>
+            </form>
+          </div>
+
+          <div className="border-t border-gray-100 pt-6">
+            <h3 className="text-sm font-bold text-gray-950 font-display mb-4">{locale === 'zh-HK' ? '修改密碼' : 'Change Password'}</h3>
+            {profileMessage && (
+              <div className="mb-4 p-3 rounded-lg text-xs font-bold bg-neutral-100 text-neutral-800">
+                {profileMessage}
+              </div>
+            )}
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                const res = await apiFetch('/api/user/password', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ oldPassword: profileForm.oldPassword, newPassword: profileForm.newPassword })
+                });
+                const data = await res.json();
+                if (data.success) {
+                  setProfileMessage(locale === 'zh-HK' ? '密碼修改成功' : 'Password updated successfully');
+                  setProfileForm(p => ({ ...p, oldPassword: '', newPassword: '' }));
+                } else {
+                  setProfileMessage(data.message || 'Error updating password');
+                }
+              } catch (err) {
+                setProfileMessage('Error updating password');
+              }
+            }} className="max-w-sm space-y-4">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">{locale === 'zh-HK' ? '目前密碼' : 'Current Password'}</label>
+                <input
+                  type="password"
+                  required
+                  value={profileForm.oldPassword}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, oldPassword: e.target.value }))}
+                  className="w-full border border-gray-250 p-2.5 rounded-lg text-xs mt-1 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">{locale === 'zh-HK' ? '新密碼' : 'New Password'}</label>
+                <input
+                  type="password"
+                  required
+                  value={profileForm.newPassword}
+                  onChange={(e) => setProfileForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                  className="w-full border border-gray-250 p-2.5 rounded-lg text-xs mt-1 focus:outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                className="bg-neutral-900 hover:bg-neutral-800 text-white font-bold px-4 py-2 rounded-lg text-xs transition-colors"
+              >
+                {locale === 'zh-HK' ? '儲存' : 'Save Changes'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'orders' && (
         <div className="space-y-4">
           {orders.length === 0 ? (

@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { DollarSign, FileText, ShoppingBag, AlertTriangle, ArrowUpRight, Percent, Calendar } from 'lucide-react';
 import { Locale } from '../../types/index.ts';
@@ -11,11 +12,11 @@ export default function AdminDashboard({ locale }: AdminDashboardProps) {
   const [logs, setLogs] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch('/api/admin/stats')
+    apiFetch('/api/admin/stats')
       .then(res => res.json())
       .then(data => setStats(data));
 
-    fetch('/api/admin/audit-logs')
+    apiFetch('/api/admin/audit-logs')
       .then(res => res.json())
       .then(data => setLogs(data.slice(0, 5))); // Last 5 logs
   }, []);

@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import { db } from './db.js';
 import * as schema from './schema.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -25,7 +26,7 @@ export async function seedDatabase() {
     await db.insert(schema.users).values({
       id: `usr_${uuidv4().substring(0, 8)}`,
       email: adminEmail,
-      passwordHash: 'admin123',
+      passwordHash: await bcrypt.hash('admin123', await bcrypt.genSalt(10)),
       locale: 'zh-HK',
       status: 'active'
     });

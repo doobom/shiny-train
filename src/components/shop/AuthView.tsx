@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState } from 'react';
 
 interface AuthViewProps {
@@ -16,7 +17,7 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
     
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
     try {
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -26,7 +27,7 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
       if (data.success) {
         if (!isLogin && !data.token) {
           // If register doesn't return token, automatically login
-          const loginRes = await fetch('/api/auth/login', {
+          const loginRes = await apiFetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })

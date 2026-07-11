@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Trash2, CheckSquare, Square, ChevronRight } from 'lucide-react';
 import { Locale } from '../../types/index.ts';
@@ -15,7 +16,7 @@ export default function CartView({ locale, userId, onGoToCheckout, onSelectProdu
 
   const fetchCart = () => {
     setLoading(true);
-    fetch(`/api/cart/${userId}`)
+    apiFetch(`/api/cart/${userId}`)
       .then(res => res.json())
       .then(data => {
         setItems(data);
@@ -32,7 +33,7 @@ export default function CartView({ locale, userId, onGoToCheckout, onSelectProdu
   }, [userId]);
 
   const updateItem = (itemId: string, qty?: number, checked?: boolean) => {
-    fetch(`/api/cart/items/${itemId}`, {
+    apiFetch(`/api/cart/items/${itemId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ qty, checked })
@@ -43,7 +44,7 @@ export default function CartView({ locale, userId, onGoToCheckout, onSelectProdu
   };
 
   const deleteItem = (itemId: string) => {
-    fetch(`/api/cart/items/${itemId}`, {
+    apiFetch(`/api/cart/items/${itemId}`, {
       method: 'DELETE'
     })
     .then(res => res.json())
@@ -53,7 +54,7 @@ export default function CartView({ locale, userId, onGoToCheckout, onSelectProdu
 
 
   const handleSelectAll = (checked: boolean) => {
-    fetch('/api/cart/batch', {
+    apiFetch('/api/cart/batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'check', itemIds: items.map(i => i.id), checked })
@@ -66,7 +67,7 @@ export default function CartView({ locale, userId, onGoToCheckout, onSelectProdu
     const selectedIds = items.filter(i => i.checked).map(i => i.id);
     if (selectedIds.length === 0) return;
     
-    fetch('/api/cart/batch', {
+    apiFetch('/api/cart/batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'delete', itemIds: selectedIds })

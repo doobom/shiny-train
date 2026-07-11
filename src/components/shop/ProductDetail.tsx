@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ShoppingCart, ShieldAlert, BadgeCheck, Share2, AlertCircle } from 'lucide-react';
 import { Locale, ProductSpec } from '../../types/index.ts';
@@ -24,7 +25,7 @@ export default function ProductDetail({
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/products/${productId}`)
+    apiFetch(`/api/products/${productId}`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) return;
@@ -94,7 +95,7 @@ export default function ProductDetail({
       return;
     }
 
-    fetch('/api/cart/items', {
+    apiFetch('/api/cart/items', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, PlusCircle, AlertTriangle, Edit, RefreshCw, BadgeCheck, Trash2 } from 'lucide-react';
 import { Locale, Category } from '../../types/index.ts';
@@ -35,8 +36,8 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
   const fetchCatalog = () => {
     setLoading(true);
     Promise.all([
-      fetch('/api/categories').then(res => res.json()),
-      fetch('/api/admin/products').then(res => res.json())
+      apiFetch('/api/categories').then(res => res.json()),
+      apiFetch('/api/admin/products').then(res => res.json())
     ])
     .then(([cats, prods]) => {
       setCategories(cats);
@@ -62,7 +63,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
     try {
       // Need a way to pass authorization token
       const token = localStorage.getItem('jwt_token');
-      const res = await fetch('/api/admin/upload', {
+      const res = await apiFetch('/api/admin/upload', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -96,7 +97,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
       ]
     };
 
-    fetch('/api/admin/products', {
+    apiFetch('/api/admin/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -115,7 +116,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
   };
 
   const handleUpdateStock = (skuId: string) => {
-    fetch(`/api/admin/inventory/${skuId}`, {
+    apiFetch(`/api/admin/inventory/${skuId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -135,7 +136,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
 
   const toggleShelf = (productId: string, currentStatus: string) => {
     const nextStatus = currentStatus === 'on_shelf' ? 'off_shelf' : 'on_shelf';
-    fetch(`/api/admin/products/${productId}`, {
+    apiFetch(`/api/admin/products/${productId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: nextStatus })

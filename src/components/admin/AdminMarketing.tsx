@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { Tag, PlusCircle, AlertCircle, Percent, Check, Calendar } from 'lucide-react';
 import { Locale, Category, FullReduction } from '../../types/index.ts';
@@ -26,15 +27,15 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
   const fetchCampaigns = () => {
     setLoading(true);
     Promise.all([
-      fetch('/api/categories').then(res => res.json()),
-      fetch('/api/admin/settings').then(res => res.json()) // we read reductions or defaults
+      apiFetch('/api/categories').then(res => res.json()),
+      apiFetch('/api/admin/settings').then(res => res.json()) // we read reductions or defaults
     ])
     .then(([cats, settings]) => {
       setCategories(cats);
       if (cats.length > 0) setCategoryId(cats[0].id);
 
       // Simple fetch campaigns mock
-      fetch('/api/checkout/preview', { 
+      apiFetch('/api/checkout/preview', { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: [] }) // we can extract static rules from server files or local presets

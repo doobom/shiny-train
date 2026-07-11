@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Search, Tag, Eye, Heart, Volume2, ArrowRight } from 'lucide-react';
 import { Locale, Category, Product, Banner, Announcement } from '../../types/index.ts';
@@ -25,10 +26,10 @@ export default function ShopHome({ locale, onSelectProduct }: ShopHomeProps) {
   useEffect(() => {
     // Parallel loading from API
     Promise.all([
-      fetch('/api/banners').then(res => res.json()),
-      fetch('/api/announcements').then(res => res.json()),
-      fetch('/api/categories').then(res => res.json()),
-      fetch('/api/products/recommendations').then(res => res.json())
+      apiFetch('/api/banners').then(res => res.json()),
+      apiFetch('/api/announcements').then(res => res.json()),
+      apiFetch('/api/categories').then(res => res.json()),
+      apiFetch('/api/products/recommendations').then(res => res.json())
     ]).then(([bannersData, annsData, catsData, recsData]) => {
       setBanners(bannersData);
       setAnnouncements(annsData);
@@ -47,7 +48,7 @@ export default function ShopHome({ locale, onSelectProduct }: ShopHomeProps) {
     else if (priceRange === '100to200') url += `&priceMin=10000&priceMax=20000`;
     else if (priceRange === 'over200') url += `&priceMin=20000`;
 
-    fetch(url)
+    apiFetch(url)
       .then(res => res.json())
       .then(data => setProducts(Array.isArray(data) ? data : data.data || []))
       .catch(err => console.error(err));

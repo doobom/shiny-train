@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, CheckCircle, Clock, RefreshCw, Send, AlertCircle } from 'lucide-react';
 import { Locale, Feedback } from '../../types/index.ts';
@@ -19,7 +20,7 @@ export default function AdminFeedback({ locale }: AdminFeedbackProps) {
 
   const fetchFeedbacks = () => {
     setLoading(true);
-    fetch('/api/admin/feedbacks')
+    apiFetch('/api/admin/feedbacks')
       .then(res => res.json())
       .then(data => {
         setFeedbacks(data);
@@ -35,7 +36,7 @@ export default function AdminFeedback({ locale }: AdminFeedbackProps) {
     if (!replyText) return;
     setSubmitting(true);
 
-    fetch(`/api/admin/feedbacks/${fbId}/reply`, {
+    apiFetch(`/api/admin/feedbacks/${fbId}/reply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reply: replyText })

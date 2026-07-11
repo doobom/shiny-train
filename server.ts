@@ -6,6 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './src/server/db.js';
 import * as schema from './src/server/schema.js';
@@ -103,10 +104,32 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
   
   if (token == null) return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Token missing' });
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
+  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
     if (err) return res.status(403).json({ code: 'FORBIDDEN', message: 'Token invalid' });
-    // @ts-ignore
-    req.user = user;
+    (req as any).user = user;
+    next();
+  });
+};
+
+const authenticateAdmin = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (token == null) return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Token missing' });
+
+  jwt.verify(token, JWT_SECRET, async (err: any, user: any) => {
+    if (err) return res.status(403).json({ code: 'FORBIDDEN', message: 'Token invalid' });
+    
+    // Check role from DB
+    const dbUser = await db.query.users.findFirst({
+      where: eq(schema.users.id, user.id)
+    });
+    
+    if (!dbUser || dbUser.role !== 'admin') {
+      return res.status(403).json({ code: 'FORBIDDEN', message: 'Admin access required' });
+    }
+    
+    (req as any).user = user;
     next();
   });
 };
@@ -134,10 +157,13 @@ app.post('/api/auth/register', async (req, res) => {
   const existing = await db.query.users.findFirst({ where: eq(schema.users.email, email) });
   if (existing) return res.status(400).json({ code: 'EMAIL_EXISTS', message: 'Email already registered.' });
   
+  const salt = await bcrypt.genSalt(10);
+  const passwordHash = await bcrypt.hash(password, salt);
+  
   const newUser = {
     id: `usr_${uuidv4().substring(0, 8)}`,
     email,
-    passwordHash: password, // Mock hash
+    passwordHash,
     phoneEncrypted: phone,
     createdAt: new Date(),
     updatedAt: new Date()
@@ -150,13 +176,13 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   const user = await db.query.users.findFirst({
-    where: and(eq(schema.users.email, email), eq(schema.users.passwordHash, password))
+    where: eq(schema.users.email, email)
   });
-  if (!user) return res.status(401).json({ code: 'AUTH_FAILED', message: 'Invalid email or password.' });
-  if (user.status === 'disabled') return res.status(403).json({ code: 'USER_DISABLED', message: 'Account disabled.' });
   
-  const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ success: true, token, user: { id: user.id, email: user.email, locale: user.locale } });
+  if (!user) return res.status(401).json({ code: 'AUTH_FAILED', message: 'Invalid email or password.' });
+  
+  let isMatch = false;
+  res.json({ success: true, token, user: { id: user.id, email: user.email, locale: user.locale, role: user.role, tier: user.tier } });
 });
 
 app.post('/api/auth/password/forgot', async (req, res) => {
@@ -614,7 +640,7 @@ app.get('/api/feedbacks/mine/:userId', authenticateToken, async (req, res) => {
 });
 
 // Admin endpoints
-app.get('/api/admin/stats', authenticateToken, async (req, res) => {
+app.get('/api/admin/stats', authenticateAdmin, async (req, res) => {
   const orders = await db.query.orders.findMany();
   const products = await db.query.products.findMany();
   const inventory = await db.query.inventory.findMany();
@@ -651,7 +677,7 @@ app.get('/api/admin/stats', authenticateToken, async (req, res) => {
   });
 });
 
-app.get('/api/admin/products', authenticateToken, async (req, res) => {
+app.get('/api/admin/products', authenticateAdmin, async (req, res) => {
   const prods = await db.query.products.findMany({ orderBy: [desc(schema.products.createdAt)] });
   const allSpecs = await db.query.productSpecs.findMany();
   const allInv = await db.query.inventory.findMany();
@@ -672,7 +698,7 @@ app.get('/api/admin/products', authenticateToken, async (req, res) => {
   res.json(result);
 });
 
-app.post('/api/admin/products', authenticateToken, async (req, res) => {
+app.post('/api/admin/products', authenticateAdmin, async (req, res) => {
   const data = req.body;
   const id = `prod_${uuidv4().substring(0,8)}`;
   await db.insert(schema.products).values({
@@ -687,17 +713,17 @@ app.post('/api/admin/products', authenticateToken, async (req, res) => {
   res.json({ success: true, id });
 });
 
-app.patch('/api/admin/products/:id', authenticateToken, async (req, res) => {
+app.patch('/api/admin/products/:id', authenticateAdmin, async (req, res) => {
   await db.update(schema.products).set(req.body).where(eq(schema.products.id, req.params.id));
   res.json({ success: true });
 });
 
-app.patch('/api/admin/inventory/:skuId', authenticateToken, async (req, res) => {
+app.patch('/api/admin/inventory/:skuId', authenticateAdmin, async (req, res) => {
   await db.update(schema.inventory).set(req.body).where(eq(schema.inventory.skuId, req.params.skuId));
   res.json({ success: true });
 });
 
-app.get('/api/admin/orders', authenticateToken, async (req, res) => {
+app.get('/api/admin/orders', authenticateAdmin, async (req, res) => {
   const list = await db.query.orders.findMany({ orderBy: [desc(schema.orders.createdAt)] });
   
   const formatted = [];
@@ -719,22 +745,22 @@ app.get('/api/admin/orders', authenticateToken, async (req, res) => {
   res.json(formatted);
 });
 
-app.post('/api/admin/orders/:id/ship', authenticateToken, async (req, res) => {
+app.post('/api/admin/orders/:id/ship', authenticateAdmin, async (req, res) => {
   await db.update(schema.orders).set({ status: 'shipped', remark: req.body.trackingNo }).where(eq(schema.orders.id, req.params.id));
   res.json({ success: true });
 });
 
-app.patch('/api/admin/orders/:id/price', authenticateToken, async (req, res) => {
+app.patch('/api/admin/orders/:id/price', authenticateAdmin, async (req, res) => {
   await db.update(schema.orders).set({ grandTotalCents: req.body.grandTotalCents }).where(eq(schema.orders.id, req.params.id));
   res.json({ success: true });
 });
 
-app.post('/api/admin/orders/:id/close', authenticateToken, async (req, res) => {
+app.post('/api/admin/orders/:id/close', authenticateAdmin, async (req, res) => {
   await db.update(schema.orders).set({ status: 'cancelled' }).where(eq(schema.orders.id, req.params.id));
   res.json({ success: true });
 });
 
-app.get('/api/admin/feedbacks', authenticateToken, async (req, res) => {
+app.get('/api/admin/feedbacks', authenticateAdmin, async (req, res) => {
   const list = await db.query.feedbacks.findMany({ orderBy: [desc(schema.feedbacks.createdAt)] });
   const formatted = [];
   for (const fb of list) {
@@ -752,22 +778,22 @@ app.get('/api/admin/feedbacks', authenticateToken, async (req, res) => {
   res.json(formatted);
 });
 
-app.post('/api/admin/feedbacks/:id/reply', authenticateToken, async (req, res) => {
+app.post('/api/admin/feedbacks/:id/reply', authenticateAdmin, async (req, res) => {
   await db.update(schema.feedbacks).set({ adminReply: req.body.reply, status: 'resolved' }).where(eq(schema.feedbacks.id, req.params.id));
   res.json({ success: true });
 });
 
-app.get('/api/admin/audit-logs', authenticateToken, async (req, res) => {
+app.get('/api/admin/audit-logs', authenticateAdmin, async (req, res) => {
   const list = await db.query.auditLogs.findMany({ orderBy: [desc(schema.auditLogs.createdAt)] });
   res.json(list);
 });
 
-app.get('/api/admin/settings', authenticateToken, async (req, res) => {
+app.get('/api/admin/settings', authenticateAdmin, async (req, res) => {
   const settings = await db.query.platformSettings.findMany();
   res.json(settings);
 });
 
-app.patch('/api/admin/settings', authenticateToken, async (req, res) => {
+app.patch('/api/admin/settings', authenticateAdmin, async (req, res) => {
   const payload = req.body;
   await db.transaction(async (tx) => {
     for (const [key, value] of Object.entries(payload)) {
@@ -782,16 +808,16 @@ app.patch('/api/admin/settings', authenticateToken, async (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/api/admin/backups/trigger', authenticateToken, async (req, res) => {
+app.post('/api/admin/backups/trigger', authenticateAdmin, async (req, res) => {
   res.json({ success: true, message: 'Backup triggered.' });
 });
 
-app.get('/api/admin/reductions', authenticateToken, async (req, res) => {
+app.get('/api/admin/reductions', authenticateAdmin, async (req, res) => {
   const reductions = await db.query.fullReductions.findMany({ orderBy: [desc(schema.fullReductions.id)] });
   res.json(reductions);
 });
 
-app.post('/api/admin/reductions', authenticateToken, async (req, res) => {
+app.post('/api/admin/reductions', authenticateAdmin, async (req, res) => {
   const data = req.body;
   const id = `fr_${uuidv4().substring(0,8)}`;
   await db.insert(schema.fullReductions).values({ ...data, id });
@@ -827,7 +853,7 @@ cb(null, 'assets/' + uniqueSuffix + extension);
 
 const upload = multer({ storage: process.env.R2_ACCESS_KEY_ID ? storage : multer.memoryStorage() });
 
-app.post('/api/admin/upload', authenticateToken, upload.single('file'), (req, res) => {
+app.post('/api/admin/upload', authenticateAdmin, upload.single('file'), (req, res) => {
   if (process.env.R2_ACCESS_KEY_ID && req.file) {
  // The multer-s3 location might be a direct R2 URL, or we construct a public one
  // R2 public bucket URL needs to be configured in Cloudflare Dashboard
@@ -902,7 +928,7 @@ const storage = multerS3({
 
 const upload = multer({ storage: process.env.R2_ACCESS_KEY_ID ? storage : multer.memoryStorage() });
 
-app.post('/api/admin/upload', authenticateToken, upload.single('file'), (req, res) => {
+app.post('/api/admin/upload', authenticateAdmin, upload.single('file'), (req, res) => {
   if (process.env.R2_ACCESS_KEY_ID && req.file) {
      // The multer-s3 location might be a direct R2 URL, or we construct a public one
      // R2 public bucket URL needs to be configured in Cloudflare Dashboard

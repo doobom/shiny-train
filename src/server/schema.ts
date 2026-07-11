@@ -7,6 +7,11 @@ export const users = pgTable('users', {
   phoneEncrypted: varchar('phone_encrypted', { length: 255 }),
   locale: varchar('locale', { length: 20 }).default('zh-HK'),
   status: varchar('status', { length: 20 }).default('active'),
+  role: varchar('role', { length: 20 }).default('customer'),
+  tier: varchar('tier', { length: 20 }).default('standard'),
+  addressRecipient: varchar('address_recipient', { length: 100 }),
+  addressPhone: varchar('address_phone', { length: 50 }),
+  addressDetail: text('address_detail'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

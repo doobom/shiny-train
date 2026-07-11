@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { Settings, Save, Database, ShieldAlert, Check, RefreshCw } from 'lucide-react';
 import { Locale } from '../../types/index.ts';
@@ -19,7 +20,7 @@ export default function AdminSettings({ locale }: AdminSettingsProps) {
   const [notif, setNotif] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/admin/settings')
+    apiFetch('/api/admin/settings')
       .then(res => res.json())
       .then(data => {
         const cMin = data.find((s: any) => s.key === 'order_auto_cancel_minutes');
@@ -53,7 +54,7 @@ export default function AdminSettings({ locale }: AdminSettingsProps) {
       ]
     };
 
-    fetch('/api/admin/settings', {
+    apiFetch('/api/admin/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -72,7 +73,7 @@ export default function AdminSettings({ locale }: AdminSettingsProps) {
 
   const handleTriggerBackup = () => {
     setBackingUp(true);
-    fetch('/api/admin/backups/trigger', { method: 'POST' })
+    apiFetch('/api/admin/backups/trigger', { method: 'POST' })
       .then(res => res.json())
       .then(data => {
         setBackingUp(false);

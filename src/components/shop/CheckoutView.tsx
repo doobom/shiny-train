@@ -1,3 +1,4 @@
+import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Truck, ChevronRight, MessageSquare, AlertCircle } from 'lucide-react';
 import { Locale } from '../../types/index.ts';
@@ -24,7 +25,7 @@ export default function CheckoutView({ locale, userId, onOrderPlaced }: Checkout
 
   useEffect(() => {
     // 1. Fetch checked cart items
-    fetch(`/api/cart/${userId}`)
+    apiFetch(`/api/cart/${userId}`)
       .then(res => res.json())
       .then(data => {
         const checked = data.filter((i: any) => i.checked);
@@ -33,7 +34,7 @@ export default function CheckoutView({ locale, userId, onOrderPlaced }: Checkout
         if (checked.length > 0) {
           // 2. Fetch checkout preview calculations
           const payload = checked.map((c: any) => ({ skuId: c.skuId, qty: c.qty }));
-          fetch('/api/checkout/preview', {
+          apiFetch('/api/checkout/preview', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ items: payload })
@@ -62,7 +63,7 @@ export default function CheckoutView({ locale, userId, onOrderPlaced }: Checkout
       remark
     };
 
-    fetch('/api/orders', {
+    apiFetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
