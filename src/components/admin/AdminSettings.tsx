@@ -13,6 +13,8 @@ export default function AdminSettings({ locale }: AdminSettingsProps) {
   const [firstWeight, setFirstWeight] = useState(30);
   const [extraWeight, setExtraWeight] = useState(10);
   const [warnThreshold, setWarnThreshold] = useState(15);
+  const [maxPerItem, setMaxPerItem] = useState(999);
+  const [maxTotal, setMaxTotal] = useState(9999);
   
   const [backupLogs, setBackupLogs] = useState<any[]>([]);
   const [backingUp, setBackingUp] = useState(false);
@@ -96,6 +98,8 @@ export default function AdminSettings({ locale }: AdminSettingsProps) {
       firstWtLabel: '順豐物流首重計費 (HK$ / 1KG)',
       extraWtLabel: '順豐物流續重計費 (HK$ / 每增加1KG)',
       thresholdLabel: '默認低庫存預警警戒線 (商品規格數)',
+      maxPerItemLabel: '單品限購數量上限 (D20)',
+      maxTotalLabel: '單次購物總件數上限 (D20)',
       backupTitle: '系統數據庫定點備份 (PITR)',
       backupBtn: '手動觸發定點備份',
       backupLogs: '最近備份歷史記錄',
@@ -111,6 +115,8 @@ export default function AdminSettings({ locale }: AdminSettingsProps) {
       firstWtLabel: 'SF Express Standard First 1KG Carriage (HK$)',
       extraWtLabel: 'SF Express Extra Carriage Per KG (HK$)',
       thresholdLabel: 'Default Inventory Alert Threshold',
+      maxPerItemLabel: 'Max Qty Per Item (D20)',
+      maxTotalLabel: 'Max Total Qty Per Order (D20)',
       backupTitle: 'Database Point-In-Time Backup (PITR)',
       backupBtn: 'Manually Trigger Backup',
       backupLogs: 'Recent Backup Log Registry',
@@ -195,6 +201,26 @@ export default function AdminSettings({ locale }: AdminSettingsProps) {
                 />
               </div>
             </div>
+
+            
+              <div className="space-y-1.5">
+                <label>{dict.maxPerItemLabel}</label>
+                <input 
+                  type="number" 
+                  value={maxPerItem} 
+                  onChange={e => setMaxPerItem(Number(e.target.value))} 
+                  className="w-full border p-2.5 rounded-lg text-gray-950 font-mono" 
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label>{dict.maxTotalLabel}</label>
+                <input 
+                  type="number" 
+                  value={maxTotal} 
+                  onChange={e => setMaxTotal(Number(e.target.value))} 
+                  className="w-full border p-2.5 rounded-lg text-gray-950 font-mono" 
+                />
+              </div>
 
             <div className="pt-2">
               <button 

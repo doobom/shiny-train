@@ -5,17 +5,11 @@ import { v4 as uuidv4 } from 'uuid';
 
 import fs from 'fs';
 import path from 'path';
-import pool from './postgres_pool.js';
+
 
 export async function seedDatabase() {
   console.log('Initializing database schema...');
-  try {
-    const schemaSql = fs.readFileSync(path.join(process.cwd(), 'src/server/schema.sql'), 'utf-8');
-    await pool.query(schemaSql);
-    console.log('Schema created successfully.');
-  } catch (err) {
-    console.error("Failed to create schema:", err); console.error(err.stack); throw err;
-  }
+  console.log("Schema is managed by drizzle sqlite");
 
   console.log('Seeding database...');
   // Add Admin

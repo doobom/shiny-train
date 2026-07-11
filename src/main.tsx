@@ -25,8 +25,14 @@ Object.defineProperty(window, 'fetch', {
       };
     }
 
-    return originalFetch(resource, config);
+    
+    const response = await originalFetch(resource, config);
+    if (response.status === 429) {
+      alert('請求過於頻繁，請稍後再試 (Too Many Requests)');
+    }
+    return response;
   },
+
   configurable: true,
   writable: true
 });

@@ -1,155 +1,156 @@
-import { pgTable, varchar, text, integer, boolean, timestamp, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, text, integer, boolean, timestamp, jsonb, doublePrecision } from 'drizzle-orm/pg-core';
+
 
 export const users = pgTable('users', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  email: varchar('email', { length: 255 }).notNull().unique(),
-  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
-  phoneEncrypted: varchar('phone_encrypted', { length: 255 }),
-  locale: varchar('locale', { length: 20 }).default('zh-HK'),
-  status: varchar('status', { length: 20 }).default('active'),
-  role: varchar('role', { length: 20 }).default('customer'),
+  id: text('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  phoneEncrypted: text('phone_encrypted'),
+  locale: text('locale').default('zh-HK'),
+  status: text('status').default('active'),
+  role: text('role').default('customer'),
   permissions: jsonb('permissions'),
-  tier: varchar('tier', { length: 20 }).default('standard'),
+  tier: text('tier').default('standard'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 export const categories = pgTable('categories', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  nameZh: varchar('name_zh', { length: 100 }).notNull(),
-  nameEn: varchar('name_en', { length: 100 }).notNull(),
+  id: text('id').primaryKey(),
+  nameZh: text('name_zh').notNull(),
+  nameEn: text('name_en').notNull(),
   sort: integer('sort').default(0),
   disabled: boolean('disabled').default(false),
 });
 
 export const products = pgTable('products', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  nameZh: varchar('name_zh', { length: 255 }).notNull(),
-  nameEn: varchar('name_en', { length: 255 }).notNull(),
+  id: text('id').primaryKey(),
+  nameZh: text('name_zh').notNull(),
+  nameEn: text('name_en').notNull(),
   descriptionZh: text('description_zh'),
   descriptionEn: text('description_en'),
   priceOriginalCents: integer('price_original_cents').notNull(),
   priceAfterCents: integer('price_after_cents').notNull(),
-  categoryId: varchar('category_id', { length: 50 }).references(() => categories.id),
-  status: varchar('status', { length: 50 }).default('on_shelf'),
+  categoryId: text('category_id').references(() => categories.id),
+  status: text('status').default('on_shelf'),
   images: jsonb('images').default('[]'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 export const productSpecs = pgTable('product_specs', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  productId: varchar('product_id', { length: 50 }).references(() => products.id),
-  specNameZh: varchar('spec_name_zh', { length: 255 }).notNull(),
-  specNameEn: varchar('spec_name_en', { length: 255 }).notNull(),
+  id: text('id').primaryKey(),
+  productId: text('product_id').references(() => products.id),
+  specNameZh: text('spec_name_zh').notNull(),
+  specNameEn: text('spec_name_en').notNull(),
   priceOriginalCents: integer('price_original_cents').notNull(),
   priceAfterCents: integer('price_after_cents').notNull(),
 });
 
 export const inventory = pgTable('inventory', {
-  skuId: varchar('sku_id', { length: 50 }).primaryKey().references(() => productSpecs.id),
+  skuId: text('sku_id').primaryKey().references(() => productSpecs.id),
   stock: integer('stock').notNull().default(0),
   lockedStock: integer('locked_stock').notNull().default(0),
   warnThreshold: integer('warn_threshold').notNull().default(10),
 });
 
 export const carts = pgTable('carts', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  userId: varchar('user_id', { length: 50 }).references(() => users.id),
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 export const cartItems = pgTable('cart_items', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  cartId: varchar('cart_id', { length: 50 }).references(() => carts.id),
-  skuId: varchar('sku_id', { length: 50 }).references(() => productSpecs.id),
+  id: text('id').primaryKey(),
+  cartId: text('cart_id').references(() => carts.id),
+  skuId: text('sku_id').references(() => productSpecs.id),
   qty: integer('qty').notNull(),
   checked: boolean('checked').default(true),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
 export const orders = pgTable('orders', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  userId: varchar('user_id', { length: 50 }).references(() => users.id),
-  status: varchar('status', { length: 50 }).notNull(),
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
+  status: text('status').notNull(),
   totalCents: integer('total_cents').notNull(),
   shippingFeeCents: integer('shipping_fee_cents').notNull(),
   discountCents: integer('discount_cents').notNull(),
   grandTotalCents: integer('grand_total_cents').notNull(),
-  addressRecipient: varchar('address_recipient', { length: 100 }),
-  addressPhone: varchar('address_phone', { length: 50 }),
+  addressRecipient: text('address_recipient'),
+  addressPhone: text('address_phone'),
   addressDetail: text('address_detail'),
-  paymentMethod: varchar('payment_method', { length: 50 }),
+  paymentMethod: text('payment_method'),
   remark: text('remark'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 export const orderItems = pgTable('order_items', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  orderId: varchar('order_id', { length: 50 }).references(() => orders.id),
-  skuId: varchar('sku_id', { length: 50 }).references(() => productSpecs.id),
+  id: text('id').primaryKey(),
+  orderId: text('order_id').references(() => orders.id),
+  skuId: text('sku_id').references(() => productSpecs.id),
   qty: integer('qty').notNull(),
   priceCents: integer('price_cents').notNull(),
 });
 
 export const feedbacks = pgTable('feedbacks', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  userId: varchar('user_id', { length: 50 }).references(() => users.id),
-  orderId: varchar('order_id', { length: 50 }),
-  type: varchar('type', { length: 50 }),
-  contact: varchar('contact', { length: 255 }),
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
+  orderId: text('order_id'),
+  type: text('type'),
+  contact: text('contact'),
   content: text('content').notNull(),
-  status: varchar('status', { length: 50 }).default('pending'),
+  status: text('status').default('pending'),
   adminReply: text('admin_reply'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 export const auditLogs = pgTable('audit_logs', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  adminId: varchar('admin_id', { length: 50 }),
-  action: varchar('action', { length: 255 }).notNull(),
-  resource: varchar('resource', { length: 255 }),
+  id: text('id').primaryKey(),
+  adminId: text('admin_id'),
+  action: text('action').notNull(),
+  resource: text('resource'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
 export const banners = pgTable('banners', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  imageUrl: varchar('image_url', { length: 255 }).notNull(),
-  linkUrl: varchar('link_url', { length: 255 }),
+  id: text('id').primaryKey(),
+  imageUrl: text('image_url').notNull(),
+  linkUrl: text('link_url'),
   sort: integer('sort').default(0),
   disabled: boolean('disabled').default(false),
 });
 
 export const announcements = pgTable('announcements', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  titleZh: varchar('title_zh', { length: 255 }).notNull(),
-  titleEn: varchar('title_en', { length: 255 }).notNull(),
+  id: text('id').primaryKey(),
+  titleZh: text('title_zh').notNull(),
+  titleEn: text('title_en').notNull(),
   contentZh: text('content_zh'),
   contentEn: text('content_en'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
 export const faqs = pgTable('faqs', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  questionZh: varchar('question_zh', { length: 255 }).notNull(),
-  questionEn: varchar('question_en', { length: 255 }).notNull(),
+  id: text('id').primaryKey(),
+  questionZh: text('question_zh').notNull(),
+  questionEn: text('question_en').notNull(),
   answerZh: text('answer_zh'),
   answerEn: text('answer_en'),
   sort: integer('sort').default(0),
 });
 
 export const platformSettings = pgTable('platform_settings', {
-  key: varchar('key', { length: 50 }).primaryKey(),
-  value: varchar('value', { length: 255 }).notNull(),
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 export const discounts = pgTable('discounts', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  code: varchar('code', { length: 50 }).unique().notNull(),
-  type: varchar('type', { length: 50 }).notNull(),
+  id: text('id').primaryKey(),
+  code: text('code').unique().notNull(),
+  type: text('type').notNull(),
   value: integer('value').notNull(),
   minOrderValueCents: integer('min_order_value_cents'),
   active: boolean('active').default(true),
@@ -157,27 +158,27 @@ export const discounts = pgTable('discounts', {
 });
 
 export const fullReductions = pgTable('full_reductions', {
-  id: varchar('id', { length: 50 }).primaryKey(),
+  id: text('id').primaryKey(),
   thresholdCents: integer('threshold_cents').notNull(),
   reduceCents: integer('reduce_cents').notNull(),
   active: boolean('active').default(true),
 });
 
 export const payments = pgTable('payments', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  orderId: varchar('order_id', { length: 50 }).references(() => orders.id),
-  method: varchar('method', { length: 50 }).notNull(),
+  id: text('id').primaryKey(),
+  orderId: text('order_id').references(() => orders.id),
+  method: text('method').notNull(),
   amountCents: integer('amount_cents').notNull(),
-  status: varchar('status', { length: 50 }).notNull(),
+  status: text('status').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
 
 export const addresses = pgTable('addresses', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  userId: varchar('user_id', { length: 50 }).references(() => users.id),
-  recipient: varchar('recipient', { length: 100 }).notNull(),
-  phone: varchar('phone', { length: 50 }).notNull(),
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
+  recipient: text('recipient').notNull(),
+  phone: text('phone').notNull(),
   detail: text('detail').notNull(),
   isDefault: boolean('is_default').default(false),
   createdAt: timestamp('created_at').defaultNow(),
@@ -185,67 +186,67 @@ export const addresses = pgTable('addresses', {
 });
 
 export const favorites = pgTable('favorites', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  userId: varchar('user_id', { length: 50 }).references(() => users.id),
-  productId: varchar('product_id', { length: 50 }).references(() => products.id),
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
+  productId: text('product_id').references(() => products.id),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
 export const emailResetTokens = pgTable('email_reset_tokens', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  userId: varchar('user_id', { length: 50 }).references(() => users.id),
-  token: varchar('token', { length: 255 }).notNull().unique(),
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
+  token: text('token').notNull().unique(),
   used: boolean('used').default(false),
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
 export const paymentMethods = pgTable('payment_methods', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  code: varchar('code', { length: 50 }).unique().notNull(), // stripe, alipay, wechat, bank
-  nameZh: varchar('name_zh', { length: 100 }),
-  nameEn: varchar('name_en', { length: 100 }),
+  id: text('id').primaryKey(),
+  code: text('code').unique().notNull(), // stripe, alipay, wechat, bank
+  nameZh: text('name_zh'),
+  nameEn: text('name_en'),
   config: jsonb('config'),
   active: boolean('active').default(true),
   sort: integer('sort').default(0),
 });
 
 export const shippingTemplates = pgTable('shipping_templates', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  nameZh: varchar('name_zh', { length: 100 }),
-  nameEn: varchar('name_en', { length: 100 }),
+  id: text('id').primaryKey(),
+  nameZh: text('name_zh'),
+  nameEn: text('name_en'),
   baseFeeCents: integer('base_fee_cents').notNull().default(3000),
   freeShippingThresholdCents: integer('free_shipping_threshold_cents').default(30000),
   active: boolean('active').default(true),
 });
 
 export const shippingLogs = pgTable('shipping_logs', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  orderId: varchar('order_id', { length: 50 }).references(() => orders.id),
-  status: varchar('status', { length: 50 }).notNull(),
+  id: text('id').primaryKey(),
+  orderId: text('order_id').references(() => orders.id),
+  status: text('status').notNull(),
   details: text('details'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
 export const memberLevels = pgTable('member_levels', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  tier: varchar('tier', { length: 50 }).unique().notNull(),
-  nameZh: varchar('name_zh', { length: 100 }),
-  nameEn: varchar('name_en', { length: 100 }),
+  id: text('id').primaryKey(),
+  tier: text('tier').unique().notNull(),
+  nameZh: text('name_zh'),
+  nameEn: text('name_en'),
   minSpendCents: integer('min_spend_cents').default(0),
   discountPercent: integer('discount_percent').default(0),
 });
 
 export const roles = pgTable('roles', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  code: varchar('code', { length: 50 }).unique().notNull(),
-  nameZh: varchar('name_zh', { length: 100 }),
-  nameEn: varchar('name_en', { length: 100 }),
+  id: text('id').primaryKey(),
+  code: text('code').unique().notNull(),
+  nameZh: text('name_zh'),
+  nameEn: text('name_en'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
 export const rolePermissions = pgTable('role_permissions', {
-  id: varchar('id', { length: 50 }).primaryKey(),
-  roleId: varchar('role_id', { length: 50 }).references(() => roles.id),
-  module: varchar('module', { length: 100 }).notNull(),
+  id: text('id').primaryKey(),
+  roleId: text('role_id').references(() => roles.id),
+  module: text('module').notNull(),
 });
