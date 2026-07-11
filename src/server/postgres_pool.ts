@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { Pool } from 'pg';
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://shop_user:your_secure_password@localhost:5432/shop_db',
