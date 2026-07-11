@@ -14,7 +14,7 @@ import { seedDatabase } from './src/server/seed.js';
 import { eq, and, or, inArray, sql, desc, gte, sum, ilike } from 'drizzle-orm';
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = 3000;
 
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
@@ -152,37 +152,59 @@ app.post('/api/seed', async (req, res) => {
 // Setup auth interceptor context
 // Auth
 app.post('/api/auth/register', async (req, res) => {
-  const { email, password, phone } = req.body;
-  if (!email || !password) return res.status(400).json({ code: 'INVALID_INPUT', message: 'Email and password required' });
-  const existing = await db.query.users.findFirst({ where: eq(schema.users.email, email) });
-  if (existing) return res.status(400).json({ code: 'EMAIL_EXISTS', message: 'Email already registered.' });
-  
-  const salt = await bcrypt.genSalt(10);
-  const passwordHash = await bcrypt.hash(password, salt);
-  
-  const newUser = {
-    id: `usr_${uuidv4().substring(0, 8)}`,
-    email,
-    passwordHash,
-    phoneEncrypted: phone,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-  await db.insert(schema.users).values(newUser);
-  await db.insert(schema.carts).values({ id: `cart_${newUser.id}`, userId: newUser.id });
-  res.json({ success: true, user: { id: newUser.id, email: newUser.email, locale: 'zh-HK' } });
+  try {
+    const { email, password, phone } = req.body;
+    if (!email || !password) return res.status(400).json({ code: 'INVALID_INPUT', message: 'Email and password required' });
+    const existing = await db.query.users.findFirst({ where: eq(schema.users.email, email) });
+    if (existing) return res.status(400).json({ code: 'EMAIL_EXISTS', message: 'Email already registered.' });
+    
+    const pepper = process.env.PASSWORD_SALT || '';
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password + pepper, salt);
+    
+    const newUser = {
+      id: `usr_${uuidv4().substring(0, 8)}`,
+      email,
+      passwordHash,
+      phoneEncrypted: phone,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    await db.insert(schema.users).values(newUser);
+    await db.insert(schema.carts).values({ id: `cart_${newUser.id}`, userId: newUser.id });
+    res.json({ success: true, user: { id: newUser.id, email: newUser.email, locale: 'zh-HK' } });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ code: 'SERVER_ERROR', message: 'Internal server error.' });
+  }
 });
 
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password } = req.body;
-  const user = await db.query.users.findFirst({
-    where: eq(schema.users.email, email)
-  });
-  
-  if (!user) return res.status(401).json({ code: 'AUTH_FAILED', message: 'Invalid email or password.' });
-  
-  let isMatch = false;
-  res.json({ success: true, token, user: { id: user.id, email: user.email, locale: user.locale, role: user.role, tier: user.tier } });
+  try {
+    const { email, password } = req.body;
+    const user = await db.query.users.findFirst({
+      where: eq(schema.users.email, email)
+    });
+    
+    if (!user) return res.status(401).json({ code: 'AUTH_FAILED', message: 'Invalid email or password.' });
+    
+    const pepper = process.env.PASSWORD_SALT || '';
+    // password from frontend could be plain text or sha-256 hashed.
+    // If frontend hashes it, they send us a hash. Then we prepend pepper and bcrypt.
+    let isMatch = await bcrypt.compare(password + pepper, user.passwordHash);
+    if (!isMatch) {
+      // Fallback for old passwords without pepper
+      isMatch = await bcrypt.compare(password, user.passwordHash);
+    }
+    
+    if (!isMatch) return res.status(401).json({ code: 'AUTH_FAILED', message: 'Invalid email or password.' });
+    
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ success: true, token, user: { id: user.id, email: user.email, locale: user.locale, role: user.role, tier: user.tier } });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ code: 'SERVER_ERROR', message: 'Internal server error.' });
+  }
 });
 
 app.post('/api/auth/password/forgot', async (req, res) => {
@@ -190,6 +212,33 @@ app.post('/api/auth/password/forgot', async (req, res) => {
   const user = await db.query.users.findFirst({ where: eq(schema.users.email, email) });
   if (!user) return res.status(404).json({ code: 'USER_NOT_FOUND', message: 'User not found.' });
   res.json({ success: true, message: 'Reset link sent to email.' });
+});
+
+
+app.put('/api/auth/profile/email', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.id;
+    const { newEmail } = req.body;
+    
+    if (!newEmail || !newEmail.includes('@')) {
+      return res.status(400).json({ code: 'INVALID_INPUT', message: 'Invalid email address.' });
+    }
+    
+    // Check if new email is taken
+    const existing = await db.query.users.findFirst({ where: eq(schema.users.email, newEmail) });
+    if (existing) {
+      return res.status(400).json({ code: 'EMAIL_EXISTS', message: 'Email is already in use.' });
+    }
+    
+    await db.update(schema.users)
+      .set({ email: newEmail, updatedAt: new Date() })
+      .where(eq(schema.users.id, userId));
+      
+    res.json({ success: true, email: newEmail });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ code: 'SERVER_ERROR', message: 'Internal server error.' });
+  }
 });
 
 app.post('/api/auth/password/reset', async (req, res) => {

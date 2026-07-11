@@ -1,6 +1,15 @@
 import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState } from 'react';
 
+async function hashPassword(password: string) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
+}
+
 interface AuthViewProps {
   onLoginSuccess: (token: string, user: any) => void;
 }
@@ -17,10 +26,11 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
     
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
     try {
+      const hashedPassword = await hashPassword(password);
       const res = await apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password: hashedPassword })
       });
       const data = await res.json();
       
@@ -30,7 +40,7 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
           const loginRes = await apiFetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email, password: hashedPassword })
           });
           const loginData = await loginRes.json();
           if (loginData.success) {

@@ -8,6 +8,7 @@ export const users = pgTable('users', {
   locale: varchar('locale', { length: 20 }).default('zh-HK'),
   status: varchar('status', { length: 20 }).default('active'),
   role: varchar('role', { length: 20 }).default('customer'),
+  permissions: jsonb('permissions'),
   tier: varchar('tier', { length: 20 }).default('standard'),
   addressRecipient: varchar('address_recipient', { length: 100 }),
   addressPhone: varchar('address_phone', { length: 50 }),

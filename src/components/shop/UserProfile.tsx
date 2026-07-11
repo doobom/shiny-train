@@ -14,6 +14,9 @@ export default function UserProfile({ userId, locale }: UserProfileProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'tickets' | 'faqs'>('profile');
   const [profileForm, setProfileForm] = useState({ oldPassword: '', newPassword: '', addressRecipient: '', addressPhone: '', addressDetail: '' });
   const [profileMessage, setProfileMessage] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [emailMsg, setEmailMsg] = useState('');
+
   const [orders, setOrders] = useState<any[]>([]);
   const [tickets, setTickets] = useState<Feedback[]>([]);
   const [faqs, setFaqs] = useState<FAQ[]>([]);
@@ -209,6 +212,41 @@ export default function UserProfile({ userId, locale }: UserProfileProps) {
               </div>
             </div>
             
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setEmailMsg('');
+              const res = await apiFetch('/api/auth/profile/email', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ newEmail })
+              });
+              const data = await res.json();
+              if (data.success) {
+                localStorage.setItem('user', JSON.stringify({ ...user, email: data.email })); window.location.reload();
+                setNewEmail('');
+                setEmailMsg('Email updated successfully');
+              } else {
+                setEmailMsg(data.message || 'Failed to update email');
+              }
+            }} className="mt-6 border-t pt-4">
+              <h4 className="text-xs font-bold text-gray-900 mb-2">{locale === 'zh-HK' ? '修改電郵' : 'Change Email'}</h4>
+              <div className="flex gap-2">
+                <input 
+                  type="email" 
+                  required 
+                  value={newEmail} 
+                  onChange={e => setNewEmail(e.target.value)} 
+                  placeholder={locale === 'zh-HK' ? '新電郵地址' : 'New Email Address'} 
+                  className="flex-1 text-xs border border-gray-250 p-2 rounded-lg"
+                />
+                <button type="submit" className="bg-neutral-900 text-white text-xs px-4 py-2 rounded-lg font-bold">
+                  {locale === 'zh-HK' ? '更新' : 'Update'}
+                </button>
+              </div>
+              {emailMsg && <p className="text-[10px] text-gray-500 mt-1">{emailMsg}</p>}
+            </form>
+  
             <form onSubmit={async (e) => {
               e.preventDefault();
               try {
