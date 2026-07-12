@@ -157,7 +157,25 @@ const authenticateAdmin = (req: any, res: any, next: any) => {
     if (!dbUser || dbUser.role !== 'admin') {
       return res.status(403).json({ code: 'FORBIDDEN', message: 'Admin access required' });
     }
-    req.user = dbUser;
+    
+    // Load Role Permissions and merge
+    const rolePerms = await db.query.rolePermissions.findMany({
+      where: eq(schema.rolePermissions.roleId, dbUser.role)
+    });
+    
+    let mergedPerms = Array.isArray(dbUser.permissions) ? [...dbUser.permissions] : [];
+    rolePerms.forEach(rp => {
+      if (!mergedPerms.includes(rp.module)) {
+        mergedPerms.push(rp.module);
+      }
+    });
+    
+    // Auto-grant all if email is the root admin
+    if (dbUser.email === process.env.ADMIN_EMAIL || process.env.ADMIN_EMAIL === undefined) {
+      if (!mergedPerms.includes('all')) mergedPerms.push('all');
+    }
+    
+    req.user = { ...dbUser, permissions: mergedPerms };
     next();
   });
 };
@@ -1994,6 +2012,39 @@ app.patch('/api/admin/roles/:id', authenticateAdmin, async (req, res) => {
 });
 app.delete('/api/admin/roles/:id', authenticateAdmin, async (req, res) => {
   await db.delete(schema.roles).where(eq(schema.roles.id, req.params.id));
+  res.json({ success: true });
+});
+
+
+app.get('/api/admin/permissions/catalog', authenticateAdmin, async (req, res) => {
+  res.json({
+    success: true,
+    catalog: [
+      { code: 'manage_users', name: 'Manage Users' },
+      { code: 'manage_orders', name: 'Manage Orders' },
+      { code: 'manage_products', name: 'Manage Products' },
+      { code: 'content', name: 'CMS & Marketing' },
+      { code: 'settings', name: 'Platform Settings' },
+      { code: 'all', name: 'Super Admin (All Access)' }
+    ]
+  });
+});
+
+app.put('/api/admin/roles/:id/permissions', authenticateAdmin, async (req, res) => {
+  const { permissions } = req.body; // array of strings
+  if (!Array.isArray(permissions)) return res.status(400).json({ code: 'INVALID_INPUT' });
+  
+  await db.transaction(async (tx) => {
+    await tx.delete(schema.rolePermissions).where(eq(schema.rolePermissions.roleId, req.params.id));
+    for (const p of permissions) {
+      await tx.insert(schema.rolePermissions).values({
+        id: `rp_${require('uuid').v4().substring(0,8)}`,
+        roleId: req.params.id,
+        module: p
+      });
+    }
+  });
+  
   res.json({ success: true });
 });
 

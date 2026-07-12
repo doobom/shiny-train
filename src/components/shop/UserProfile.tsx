@@ -2,6 +2,8 @@ import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { FileText, Search, PlusCircle, HelpCircle, AlertCircle, RefreshCw, Truck, BadgeCheck } from 'lucide-react';
 import { Locale, Order, Feedback, FAQ } from '../../types/index.ts';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface UserProfileProps {
   userId: string;
@@ -20,6 +22,55 @@ export default function UserProfile({ userId, locale }: UserProfileProps) {
   const [orders, setOrders] = useState<any[]>([]);
   const [tickets, setTickets] = useState<Feedback[]>([]);
   const [faqs, setFaqs] = useState<FAQ[]>([]);
+  const downloadReceipt = async (orderId: string) => {
+    try {
+      const res = await apiFetch('/api/orders/' + orderId + '/receipt');
+      const data = await res.json();
+      if (!data.success) return;
+      
+      const r = data.receipt;
+      const receiptDiv = document.createElement('div');
+      receiptDiv.style.width = '400px';
+      receiptDiv.style.padding = '20px';
+      receiptDiv.style.background = '#fff';
+      receiptDiv.style.color = '#000';
+      receiptDiv.style.fontFamily = 'sans-serif';
+      receiptDiv.innerHTML = `
+        <h2 style="text-align: center; margin-bottom: 5px;">${r.company}</h2>
+        <p style="text-align: center; font-size: 10px; margin-top: 0;">BRN: ${r.taxId}</p>
+        <hr/>
+        <p><strong>Order No:</strong> ${r.orderNo}</p>
+        <p><strong>Date:</strong> ${new Date(r.date).toLocaleString()}</p>
+        <p><strong>Customer:</strong> ${r.customerName}</p>
+        <hr/>
+        <table style="width: 100%; font-size: 12px;">
+          <tr><th style="text-align:left">Item</th><th>Qty</th><th style="text-align:right">Price</th></tr>
+          ${r.items.map((i:any) => `<tr><td>${i.skuId}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">HK${(i.unitPrice/100).toFixed(2)}</td></tr>`).join('')}
+        </table>
+        <hr/>
+        <p style="text-align: right; margin: 5px 0;">Subtotal: HK${(r.subtotal/100).toFixed(2)}</p>
+        <p style="text-align: right; margin: 5px 0;">Shipping: HK${(r.shippingFee/100).toFixed(2)}</p>
+        <p style="text-align: right; margin: 5px 0;">Discount: -HK${(r.discount/100).toFixed(2)}</p>
+        <h3 style="text-align: right; margin: 10px 0;">Total: HK${(r.grandTotal/100).toFixed(2)}</h3>
+        <p style="text-align: center; font-size: 10px; margin-top: 20px;">Thank you for your purchase!</p>
+      `;
+      document.body.appendChild(receiptDiv);
+      
+      const canvas = await html2canvas(receiptDiv);
+      document.body.removeChild(receiptDiv);
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(`Receipt_${orderId}.pdf`);
+    } catch(e) {
+      console.error('Failed to generate receipt', e);
+    }
+  };
   const [loading, setLoading] = useState(true);
 
   // Help desk Ticket Form States
@@ -176,6 +227,7 @@ export default function UserProfile({ userId, locale }: UserProfileProps) {
       {/* Tab controls */}
       <div className="flex border-b border-gray-200">
         {[
+          { id: 'profile', label: locale === 'zh-HK' ? '個人資料' : 'Profile' },
           { id: 'orders', label: dict.tabOrders },
           { id: 'tickets', label: dict.tabTickets },
           { id: 'faqs', label: dict.tabFaq }

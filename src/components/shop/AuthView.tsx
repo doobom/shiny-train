@@ -16,13 +16,35 @@ interface AuthViewProps {
 
 export default function AuthView({ onLoginSuccess }: AuthViewProps) {
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgot, setIsForgot] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [msg, setMsg] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setMsg('');
+    
+    if (isForgot) {
+      try {
+        const res = await apiFetch('/api/auth/password/forgot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setMsg(data.message || 'Reset link sent to your email.');
+        } else {
+          setError(data.message || 'Failed to send reset link.');
+        }
+      } catch (err) {
+        setError('Network error');
+      }
+      return;
+    }
     
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
     try {

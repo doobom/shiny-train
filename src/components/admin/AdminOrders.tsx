@@ -185,6 +185,11 @@ export default function AdminOrders({ locale }: AdminOrdersProps) {
         </div>
       )}
 
+      <button onClick={() => {
+        window.open('/api/admin/orders/export?token=' + localStorage.getItem('token'), '_blank');
+      }} className="bg-gray-900 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-800 absolute right-6 top-6">
+        Export CSV
+      </button>
       {/* Filter and search bars */}
       <div className="flex flex-wrap gap-3 items-center justify-between bg-gray-50/50 p-4 rounded-xl border border-gray-100">
         <div className="flex flex-wrap gap-2">

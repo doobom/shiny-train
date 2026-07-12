@@ -297,7 +297,9 @@ export default function App() {
 
       {/* Main Content Space */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8">
-        {!tokenReady && (isAdminMode || !['shop_home', 'product_detail', 'cart'].includes(currentView)) ? (
+        {window.location.pathname === '/password/reset' ? (
+          <PasswordReset />
+        ) : !tokenReady && (isAdminMode || !['shop_home', 'product_detail', 'cart'].includes(currentView)) ? (
           <AuthView onLoginSuccess={handleLoginSuccess} />
         ) : !isAdminMode ? (
           // Renders C-End Customer shopping screens
@@ -426,6 +428,7 @@ export default function App() {
               {activeAdminTab === 'products' && <AdminProducts locale={locale} />}
               {activeAdminTab === 'orders' && <AdminOrders locale={locale} />}
               {activeAdminTab === 'marketing' && <AdminMarketing locale={locale} />}
+              {activeAdminTab === 'cms' && <AdminCMS locale={locale} />}
               {activeAdminTab === 'feedback' && <AdminFeedback locale={locale} />}
               {activeAdminTab === 'settings' && <AdminSettings locale={locale} />}
               {activeAdminTab === 'users' && <AdminUsers locale={locale} />}
