@@ -289,7 +289,8 @@ app.post('/api/auth/password/forgot', async (req, res) => {
     used: false
   });
 
-  const resetLink = `https://shop.apcube.com/password/reset?token=${rawToken}`;
+  const appUrl = process.env.APP_URL || 'https://shop.apcube.com';
+  const resetLink = `${appUrl}/password/reset?token=${rawToken}`;
   
   try {
     // Attempt to use emailQueue if it exists
@@ -477,20 +478,14 @@ app.get('/api/cart/:userId', authenticateToken, async (req, res) => {
     if (!spec) return null;
     const prod = prods.find(p => p.id === spec.productId);
     if (!prod) return null;
-    const inv = invs.find(i => i.skuId === spec.id);
     return {
       id: item.id,
+      cartId: item.cartId,
       skuId: item.skuId,
       qty: item.qty,
       checked: item.checked,
-      productNameZh: prod.nameZh,
-      productNameEn: prod.nameEn,
-      specNameZh: spec.specNameZh,
-      specNameEn: spec.specNameEn,
-      priceOriginalCents: spec.priceOriginalCents,
-      priceAfterCents: spec.priceAfterCents,
-      images: prod.images,
-      stock: inv?.stock || 0
+      spec: spec,
+      product: prod
     };
   }).filter(Boolean);
 
