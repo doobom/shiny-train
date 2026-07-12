@@ -150,7 +150,7 @@ export default function PaymentView({ orderId, locale, onPaymentSuccess }: Payme
           {dict.totalDue}
         </span>
         <h2 className="text-3xl font-black font-display text-amber-400">
-          HK${(order.totalCents / 100).toFixed(2)}
+          HK${(order.grandTotalCents / 100).toFixed(2)}
         </h2>
 
         {/* Dynamic status Pill */}

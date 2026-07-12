@@ -322,13 +322,53 @@ app.post('/api/auth/password/forgot', async (req, res) => {
 
 
 
-app.get('/api/user/profile', authenticateToken, async (req, res) => {
+app.get('/api/user/addresses', authenticateToken, async (req, res) => {
   const userId = (req as any).user.id;
-  const address = await db.query.addresses.findFirst({
-    where: and(eq(schema.addresses.userId, userId), eq(schema.addresses.isDefault, true))
+  const addresses = await db.query.addresses.findMany({
+    where: eq(schema.addresses.userId, userId),
+    orderBy: (addresses, { desc }) => [desc(addresses.isDefault), desc(addresses.createdAt)]
   });
-  res.json({ address });
+  res.json({ addresses });
 });
+
+app.post('/api/user/addresses', authenticateToken, async (req, res) => {
+  const userId = (req as any).user.id;
+  const { recipient, phone, detail, remark, isDefault } = req.body;
+  
+  if (isDefault) {
+    await db.update(schema.addresses).set({ isDefault: false }).where(eq(schema.addresses.userId, userId));
+  }
+  
+  const id = `addr_${uuidv4().substring(0,8)}`;
+  await db.insert(schema.addresses).values({
+    id, userId, recipient, phone, detail, remark, isDefault: isDefault || false
+  });
+  res.json({ success: true });
+});
+
+app.put('/api/user/addresses/:id', authenticateToken, async (req, res) => {
+  const userId = (req as any).user.id;
+  const addressId = req.params.id;
+  const { recipient, phone, detail, remark, isDefault } = req.body;
+  
+  if (isDefault) {
+    await db.update(schema.addresses).set({ isDefault: false }).where(eq(schema.addresses.userId, userId));
+  }
+  
+  await db.update(schema.addresses).set({
+    recipient, phone, detail, remark, isDefault: isDefault || false, updatedAt: new Date()
+  }).where(and(eq(schema.addresses.id, addressId), eq(schema.addresses.userId, userId)));
+  
+  res.json({ success: true });
+});
+
+app.delete('/api/user/addresses/:id', authenticateToken, async (req, res) => {
+  const userId = (req as any).user.id;
+  const addressId = req.params.id;
+  await db.delete(schema.addresses).where(and(eq(schema.addresses.id, addressId), eq(schema.addresses.userId, userId)));
+  res.json({ success: true });
+});
+
 
 app.patch('/api/user/profile', authenticateToken, async (req, res) => {
   const userId = (req as any).user.id;

@@ -21,12 +21,22 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
   // --- Product State ---
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  
+  const quillModules = {
+    toolbar: [
+      [{ 'header': [1, 2, false] }],
+      ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+      [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
+      ['link', 'image'],
+      ['clean']
+    ],
+  };
   const [nameZh, setNameZh] = useState('');
   const [nameEn, setNameEn] = useState('');
   const [descriptionZh, setDescriptionZh] = useState('');
   const [descriptionEn, setDescriptionEn] = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
+  const [imageUrls, setImageUrls] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   
   const [originalCents, setOriginalCents] = useState(10000); // HK$100.00
@@ -102,7 +112,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
 
     const payload = {
       nameZh, nameEn, descriptionZh, descriptionEn, priceOriginalCents: originalCents, priceAfterCents: afterCents,
-      categoryId, imageUrls: imageUrl ? [imageUrl] : [],
+      categoryId, imageUrls: imageUrls ? imageUrls.split(',').map(s => s.trim()).filter(Boolean) : [],
       specs: specsPayload
     };
 
@@ -115,7 +125,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
     .then(() => {
       setNotif(locale === 'zh-HK' ? (editingProductId ? '商品更新成功！' : '商品發布成功！') : (editingProductId ? 'Product updated successfully!' : 'Product launched successfully!'));
       setShowAddForm(false);
-      setEditingProductId(null);
+      resetForm();
       fetchCatalog();
       setTimeout(() => setNotif(null), 3000);
     });
@@ -130,7 +140,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
     setOriginalCents(prod.priceOriginalCents || 0);
     setAfterCents(prod.priceAfterCents || 0);
     setCategoryId(prod.categoryId || '');
-    setImageUrl(prod.images?.[0] || '');
+    setImageUrls(prod.images?.join(', ') || '');
     setShowAddForm(true);
   };
 
@@ -299,7 +309,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
               {locale === 'zh-HK' ? '匯出' : 'Export'}
             </button>
             <button 
-              onClick={() => setShowAddForm(!showAddForm)}
+              onClick={() => { if (!showAddForm) resetForm(); setShowAddForm(!showAddForm); }}
               className="bg-neutral-900 hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2"
             >
               <PlusCircle className="h-4 w-4" />
@@ -329,7 +339,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase">Image URL (or upload)</label>
                   <div className="flex gap-2">
-                    <input type="text" value={imageUrl} onChange={e=>setImageUrl(e.target.value)} className="flex-1 border p-2 rounded text-xs" />
+                    <textarea rows={2} value={imageUrls} onChange={e=>setImageUrls(e.target.value)} className="flex-1 w-full border p-2 rounded text-xs" />
                     <label className="cursor-pointer bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded text-xs font-bold flex items-center">
                       {isUploading ? '...' : 'Upload'}
                       <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
@@ -341,16 +351,16 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
               <div className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase block">Description (ZH)</label>
-                  <ReactQuill theme="snow" value={descriptionZh} onChange={setDescriptionZh} className="bg-white" />
+                  <ReactQuill modules={quillModules} theme="snow" value={descriptionZh} onChange={setDescriptionZh} className="bg-white" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase block">Description (EN)</label>
-                  <ReactQuill theme="snow" value={descriptionEn} onChange={setDescriptionEn} className="bg-white" />
+                  <ReactQuill modules={quillModules} theme="snow" value={descriptionEn} onChange={setDescriptionEn} className="bg-white" />
                 </div>
               </div>
 
               <div className="border-t border-gray-200 pt-4 flex justify-end gap-2">
-                <button type="button" onClick={() => { setShowAddForm(false); setEditingProductId(null); }} className="px-4 py-2 text-xs font-bold border rounded-lg text-gray-600">Cancel</button>
+                <button type="button" onClick={() => { setShowAddForm(false); resetForm(); }} className="px-4 py-2 text-xs font-bold border rounded-lg text-gray-600">Cancel</button>
                 <button type="submit" className="px-4 py-2 text-xs font-bold bg-gray-900 text-white rounded-lg">{editingProductId ? 'Update' : 'Publish'}</button>
               </div>
             </form>

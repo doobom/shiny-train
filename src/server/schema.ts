@@ -193,6 +193,7 @@ export const addresses = pgTable('addresses', {
   phone: text('phone').notNull(),
   detail: text('detail').notNull(),
   isDefault: boolean('is_default').default(false),
+  remark: text('remark'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
