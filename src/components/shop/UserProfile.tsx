@@ -8,9 +8,10 @@ import html2canvas from 'html2canvas';
 interface UserProfileProps {
   userId: string;
   locale: Locale;
+  onPayNow?: (orderId: string) => void;
 }
 
-export default function UserProfile({ userId, locale }: UserProfileProps) {
+export default function UserProfile({ userId, locale, onPayNow }: UserProfileProps) {
   const token = localStorage.getItem('token') || '';
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'tickets' | 'faqs'>('profile');
@@ -487,12 +488,20 @@ export default function UserProfile({ userId, locale }: UserProfileProps) {
                 {/* Confirm Deliver & voluntary cancel buttons */}
                 <div className="flex justify-end gap-2 pt-1 border-t border-gray-100 mt-2">
                   {order.status === 'pending_payment' && (
-                    <button
-                      onClick={() => handleCancelOrder(order.id)}
-                      className="border border-red-200 hover:border-red-500 text-red-500 hover:text-red-700 text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors"
-                    >
-                      {dict.cancelOrder}
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handleCancelOrder(order.id)}
+                        className="border border-red-200 hover:border-red-500 text-red-500 hover:text-red-700 text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        {dict.cancelOrder}
+                      </button>
+                      <button
+                        onClick={() => onPayNow && onPayNow(order.id)}
+                        className="bg-neutral-900 hover:bg-neutral-800 text-white text-[11px] font-bold px-4 py-1.5 rounded-lg transition-colors flex items-center shadow-sm"
+                      >
+                        {locale === 'zh-HK' ? '立即付款' : 'Pay Now'}
+                      </button>
+                    </>
                   )}
                   {order.status === 'shipped' && (
                     <button

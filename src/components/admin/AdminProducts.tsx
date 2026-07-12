@@ -1,5 +1,7 @@
 import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 
 import { ShoppingBag, PlusCircle, AlertTriangle, Edit, RefreshCw, BadgeCheck, Trash2, Tag, Layers, CheckSquare } from 'lucide-react';
 import { Locale, Category } from '../../types/index.ts';
@@ -92,23 +94,44 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nameZh || !nameEn) return;
+    
+    let specsPayload = undefined;
+    if (!editingProductId) {
+       specsPayload = [{ specNameZh, specNameEn, stock: initialStock, warnThreshold }];
+    }
+
     const payload = {
       nameZh, nameEn, descriptionZh, descriptionEn, priceOriginalCents: originalCents, priceAfterCents: afterCents,
       categoryId, imageUrls: imageUrl ? [imageUrl] : [],
-      specs: [{ specNameZh, specNameEn, stock: initialStock, warnThreshold }]
+      specs: specsPayload
     };
-    apiFetch('/api/admin/products', {
-      method: 'POST',
+
+    apiFetch(editingProductId ? `/api/admin/products/${editingProductId}` : '/api/admin/products', {
+      method: editingProductId ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
     .then(res => res.json())
     .then(() => {
-      setNotif(locale === 'zh-HK' ? '商品發布成功！' : 'Product launched successfully!');
+      setNotif(locale === 'zh-HK' ? (editingProductId ? '商品更新成功！' : '商品發布成功！') : (editingProductId ? 'Product updated successfully!' : 'Product launched successfully!'));
       setShowAddForm(false);
+      setEditingProductId(null);
       fetchCatalog();
       setTimeout(() => setNotif(null), 3000);
     });
+  };
+
+  const handleEditProduct = (prod: any) => {
+    setEditingProductId(prod.id);
+    setNameZh(prod.nameZh || '');
+    setNameEn(prod.nameEn || '');
+    setDescriptionZh(prod.descriptionZh || '');
+    setDescriptionEn(prod.descriptionEn || '');
+    setOriginalCents(prod.priceOriginalCents || 0);
+    setAfterCents(prod.priceAfterCents || 0);
+    setCategoryId(prod.categoryId || '');
+    setImageUrl(prod.images?.[0] || '');
+    setShowAddForm(true);
   };
 
   const handleUpdateStock = (skuId: string) => {
@@ -318,11 +341,11 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
               <div className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase block">Description (ZH)</label>
-                  <textarea rows={4} value={descriptionZh} onChange={e => setDescriptionZh(e.target.value)} className="w-full border p-2 rounded text-xs bg-white focus:outline-none focus:border-neutral-900" />
+                  <ReactQuill theme="snow" value={descriptionZh} onChange={setDescriptionZh} className="bg-white" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase block">Description (EN)</label>
-                  <textarea rows={4} value={descriptionEn} onChange={e => setDescriptionEn(e.target.value)} className="w-full border p-2 rounded text-xs bg-white focus:outline-none focus:border-neutral-900" />
+                  <ReactQuill theme="snow" value={descriptionEn} onChange={setDescriptionEn} className="bg-white" />
                 </div>
               </div>
 

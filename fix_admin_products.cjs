@@ -1,31 +1,75 @@
 const fs = require('fs');
-let code = fs.readFileSync('server.ts', 'utf-8');
+let code = fs.readFileSync('src/components/admin/AdminProducts.tsx', 'utf8');
 
-const target = `app.get('/api/admin/products', authenticateToken, async (req, res) => {
-  const prods = await db.query.products.findMany();
-  res.json(prods);
-});`;
-
-const replacement = `app.get('/api/admin/products', authenticateToken, async (req, res) => {
-  const prods = await db.query.products.findMany({ orderBy: [desc(schema.products.createdAt)] });
-  const allSpecs = await db.query.productSpecs.findMany();
-  const allInv = await db.query.inventory.findMany();
-
-  const result = prods.map(prod => {
-    const specs = allSpecs.filter(s => s.productId === prod.id).map(s => {
-      const inv = allInv.find(i => i.skuId === s.id) || { stock: 0, lockedStock: 0, warnThreshold: 10 };
-      return {
-        ...s,
-        stock: inv.stock,
-        lockedStock: inv.lockedStock,
-        warnThreshold: inv.warnThreshold
-      };
+const createFuncTarget = `  const handleCreateProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nameZh || !nameEn) return;
+    const payload = {
+      nameZh, nameEn, descriptionZh, descriptionEn, priceOriginalCents: originalCents, priceAfterCents: afterCents,
+      categoryId, imageUrls: imageUrl ? [imageUrl] : [],
+      specs: [{ specNameZh, specNameEn, stock: initialStock, warnThreshold }]
+    };
+    apiFetch('/api/admin/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(() => {
+      setNotif(locale === 'zh-HK' ? '商品發布成功！' : 'Product launched successfully!');
+      setShowAddForm(false);
+      fetchCatalog();
+      setTimeout(() => setNotif(null), 3000);
     });
-    return { ...prod, specs };
-  });
+  };`;
 
-  res.json(result);
-});`;
+const createFuncReplace = `  const handleCreateProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nameZh || !nameEn) return;
+    
+    let specsPayload = undefined;
+    if (!editingProductId) {
+       specsPayload = [{ specNameZh, specNameEn, stock: initialStock, warnThreshold }];
+    }
 
-code = code.replace(target, replacement);
-fs.writeFileSync('server.ts', code);
+    const payload = {
+      nameZh, nameEn, descriptionZh, descriptionEn, priceOriginalCents: originalCents, priceAfterCents: afterCents,
+      categoryId, imageUrls: imageUrl ? [imageUrl] : [],
+      specs: specsPayload
+    };
+
+    apiFetch(editingProductId ? \`/api/admin/products/\${editingProductId}\` : '/api/admin/products', {
+      method: editingProductId ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(() => {
+      setNotif(locale === 'zh-HK' ? (editingProductId ? '商品更新成功！' : '商品發布成功！') : (editingProductId ? 'Product updated successfully!' : 'Product launched successfully!'));
+      setShowAddForm(false);
+      setEditingProductId(null);
+      fetchCatalog();
+      setTimeout(() => setNotif(null), 3000);
+    });
+  };
+
+  const handleEditProduct = (prod: any) => {
+    setEditingProductId(prod.id);
+    setNameZh(prod.nameZh || '');
+    setNameEn(prod.nameEn || '');
+    setDescriptionZh(prod.descriptionZh || '');
+    setDescriptionEn(prod.descriptionEn || '');
+    setOriginalCents(prod.priceOriginalCents || 0);
+    setAfterCents(prod.priceAfterCents || 0);
+    setCategoryId(prod.categoryId || '');
+    setImageUrl(prod.images?.[0] || '');
+    setShowAddForm(true);
+  };`;
+  
+if (code.includes(createFuncTarget)) {
+  code = code.replace(createFuncTarget, createFuncReplace);
+  fs.writeFileSync('src/components/admin/AdminProducts.tsx', code);
+  console.log("Patched successfully!");
+} else {
+  console.log("Could not find target!");
+}

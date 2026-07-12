@@ -392,6 +392,7 @@ export default function App() {
               <UserProfile
                 userId={userId}
                 locale={locale}
+                onPayNow={handleDirectBuy}
               />
             )}
           </div>
