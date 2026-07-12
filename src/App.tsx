@@ -55,6 +55,15 @@ export default function App() {
       setUserEmail(storedUserEmail || '');
       setTokenReady(true);
     }
+
+    const handleAuthError = () => {
+      setTokenReady(false);
+      setUserId('');
+      setUserEmail('');
+      setCurrentView('auth');
+    };
+    window.addEventListener('auth-error', handleAuthError);
+    return () => window.removeEventListener('auth-error', handleAuthError);
   }, []);
 
   const handleLoginSuccess = (token: string, user: any) => {

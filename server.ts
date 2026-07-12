@@ -159,7 +159,7 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
   if (token == null) return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Token missing' });
 
   jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (err) return res.status(403).json({ code: 'FORBIDDEN', message: 'Token invalid' });
+    if (err) return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Token invalid' });
     (req as any).user = user;
     next();
   });
@@ -171,7 +171,7 @@ const authenticateAdmin = (req: any, res: any, next: any) => {
   const token = authHeader && authHeader.split(' ')[1];
   if (token == null) return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Token missing' });
   jwt.verify(token, JWT_SECRET, async (err: any, user: any) => {
-    if (err) return res.status(403).json({ code: 'FORBIDDEN', message: 'Token invalid' });
+    if (err) return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Token invalid' });
     const dbUser = await db.query.users.findFirst({ where: eq(schema.users.id, user.id) });
     if (!dbUser || dbUser.role !== 'admin') {
       return res.status(403).json({ code: 'FORBIDDEN', message: 'Admin access required' });
@@ -320,6 +320,43 @@ app.post('/api/auth/password/forgot', async (req, res) => {
   res.json({ success: true, message: 'Reset link sent to email.' });
 });
 
+
+
+app.get('/api/user/profile', authenticateToken, async (req, res) => {
+  const userId = (req as any).user.id;
+  const address = await db.query.addresses.findFirst({
+    where: and(eq(schema.addresses.userId, userId), eq(schema.addresses.isDefault, true))
+  });
+  res.json({ address });
+});
+
+app.patch('/api/user/profile', authenticateToken, async (req, res) => {
+  const userId = (req as any).user.id;
+  const { addressRecipient, addressPhone, addressDetail } = req.body;
+  
+  let address = await db.query.addresses.findFirst({
+    where: and(eq(schema.addresses.userId, userId), eq(schema.addresses.isDefault, true))
+  });
+  
+  if (address) {
+    await db.update(schema.addresses).set({
+      recipient: addressRecipient,
+      phone: addressPhone,
+      detail: addressDetail,
+      updatedAt: new Date()
+    }).where(eq(schema.addresses.id, address.id));
+  } else {
+    await db.insert(schema.addresses).values({
+      id: `addr_${uuidv4().substring(0,8)}`,
+      userId,
+      recipient: addressRecipient,
+      phone: addressPhone,
+      detail: addressDetail,
+      isDefault: true
+    });
+  }
+  res.json({ success: true });
+});
 
 app.put('/api/auth/profile/email', authenticateToken, async (req, res) => {
   try {
@@ -992,6 +1029,22 @@ app.get('/api/admin/products', authenticateAdmin, requirePermission('products'),
   });
 
   res.json(result);
+});
+
+
+app.put('/api/admin/products/:id', authenticateAdmin, requirePermission('products'), async (req, res) => {
+  const data = req.body;
+  await db.update(schema.products).set({
+    nameZh: data.nameZh,
+    nameEn: data.nameEn,
+    descriptionZh: data.descriptionZh,
+    descriptionEn: data.descriptionEn,
+    priceOriginalCents: data.priceOriginalCents,
+    priceAfterCents: data.priceAfterCents,
+    categoryId: data.categoryId,
+    images: data.images || (data.imageUrl ? [data.imageUrl] : [])
+  }).where(eq(schema.products.id, req.params.id));
+  res.json({ success: true });
 });
 
 app.post('/api/admin/products', authenticateAdmin, requirePermission('products'), async (req, res) => {

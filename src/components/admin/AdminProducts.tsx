@@ -1,7 +1,6 @@
 import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+
 import { ShoppingBag, PlusCircle, AlertTriangle, Edit, RefreshCw, BadgeCheck, Trash2, Tag, Layers, CheckSquare } from 'lucide-react';
 import { Locale, Category } from '../../types/index.ts';
 
@@ -19,6 +18,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
 
   // --- Product State ---
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [nameZh, setNameZh] = useState('');
   const [nameEn, setNameEn] = useState('');
   const [descriptionZh, setDescriptionZh] = useState('');
@@ -318,17 +318,17 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
               <div className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase block">Description (ZH)</label>
-                  <ReactQuill theme="snow" value={descriptionZh} onChange={setDescriptionZh} className="bg-white" />
+                  <textarea rows={4} value={descriptionZh} onChange={e => setDescriptionZh(e.target.value)} className="w-full border p-2 rounded text-xs bg-white focus:outline-none focus:border-neutral-900" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase block">Description (EN)</label>
-                  <ReactQuill theme="snow" value={descriptionEn} onChange={setDescriptionEn} className="bg-white" />
+                  <textarea rows={4} value={descriptionEn} onChange={e => setDescriptionEn(e.target.value)} className="w-full border p-2 rounded text-xs bg-white focus:outline-none focus:border-neutral-900" />
                 </div>
               </div>
 
               <div className="border-t border-gray-200 pt-4 flex justify-end gap-2">
-                <button type="button" onClick={() => setShowAddForm(false)} className="px-4 py-2 text-xs font-bold border rounded-lg text-gray-600">Cancel</button>
-                <button type="submit" className="px-4 py-2 text-xs font-bold bg-gray-900 text-white rounded-lg">Publish</button>
+                <button type="button" onClick={() => { setShowAddForm(false); setEditingProductId(null); }} className="px-4 py-2 text-xs font-bold border rounded-lg text-gray-600">Cancel</button>
+                <button type="submit" className="px-4 py-2 text-xs font-bold bg-gray-900 text-white rounded-lg">{editingProductId ? 'Update' : 'Publish'}</button>
               </div>
             </form>
           )}
@@ -411,7 +411,10 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
                         {prod.status === 'on_shelf' ? (locale==='zh-HK'?'已上架':'Active') : (locale==='zh-HK'?'未上架':'Hidden')}
                       </span>
                     </td>
-                    <td className="p-4 text-right">
+                    <td className="p-4 text-right flex justify-end gap-2">
+                      <button onClick={() => handleEditProduct(prod)} className="border border-amber-200 hover:bg-amber-50 text-amber-800 text-[10px] font-bold px-2 py-1 rounded">
+                        {locale === 'zh-HK' ? '編輯' : 'Edit'}
+                      </button>
                       <button onClick={() => toggleShelf(prod.id, prod.status)} className="border border-neutral-200 hover:bg-neutral-50 text-neutral-800 text-[10px] font-bold px-2 py-1 rounded">
                         {prod.status === 'on_shelf' ? '下架' : '上架'}
                       </button>

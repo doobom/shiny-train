@@ -16,6 +16,23 @@ export default function UserProfile({ userId, locale }: UserProfileProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'tickets' | 'faqs'>('profile');
   const [profileForm, setProfileForm] = useState({ oldPassword: '', newPassword: '', addressRecipient: '', addressPhone: '', addressDetail: '' });
   const [profileMessage, setProfileMessage] = useState('');
+  
+  useEffect(() => {
+    if (activeTab === 'profile') {
+      apiFetch('/api/user/profile', { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => res.json())
+        .then(data => {
+          if (data.address) {
+            setProfileForm(p => ({
+              ...p,
+              addressRecipient: data.address.recipient || '',
+              addressPhone: data.address.phone || '',
+              addressDetail: data.address.detail || ''
+            }));
+          }
+        });
+    }
+  }, [activeTab, token]);
   const [newEmail, setNewEmail] = useState('');
   const [emailMsg, setEmailMsg] = useState('');
 
