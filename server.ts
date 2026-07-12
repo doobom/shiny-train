@@ -14,7 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { db } from './src/server/db.js';
 import * as schema from './src/server/schema.js';
 import { seedDatabase } from './src/server/seed.js';
-import { eq, and, or, inArray, sql, desc, gte, sum, ilike } from 'drizzle-orm';
+import { eq, and, or, inArray, sql, desc, asc, gte, sum, ilike } from 'drizzle-orm';
 
 
 
@@ -175,14 +175,14 @@ const authenticateAdmin = (req: any, res: any, next: any) => {
       if (!mergedPerms.includes('all')) mergedPerms.push('all');
     }
     
-    req.user = { ...dbUser, permissions: mergedPerms };
+    (req as any).user = { ...dbUser, permissions: mergedPerms };
     next();
   });
 };
 
 const requirePermission = (module: string) => {
   return (req: any, res: any, next: any) => {
-    const user = req.user;
+    const user = (req as any).user;
     if (!user) return res.status(401).json({ code: 'UNAUTHORIZED' });
     if (!user.permissions || !Array.isArray(user.permissions)) {
       return res.status(403).json({ code: 'FORBIDDEN', message: 'No permissions assigned' });
@@ -1798,7 +1798,7 @@ const isProduction = process.env.NODE_ENV === 'production' || (!process.env.NODE
 
 // C端：合并本地购物车 (登录后触发)
 app.post('/api/cart/merge', authenticateToken, async (req, res) => {
-  const userId = req.user.id;
+  const userId = (req as any).user.id;
   const { localItems } = req.body; // [{ skuId: '...', qty: 2 }]
   const cartId = `cart_${userId}`;
   
@@ -1826,7 +1826,7 @@ app.post('/api/cart/merge', authenticateToken, async (req, res) => {
 
 // C端：获取我的收藏列表
 app.get('/api/favorites', authenticateToken, async (req, res) => {
-  const userId = req.user.id;
+  const userId = (req as any).user.id;
   const favs = await db.query.favorites.findMany({ where: eq(schema.favorites.userId, userId) });
   const productIds = favs.map(f => f.productId);
   const prods = productIds.length ? await db.query.products.findMany({ where: inArray(schema.products.id, productIds) }) : [];
@@ -1835,7 +1835,7 @@ app.get('/api/favorites', authenticateToken, async (req, res) => {
 
 // C端：添加/取消收藏
 app.post('/api/favorites/:productId', authenticateToken, async (req, res) => {
-  const userId = req.user.id;
+  const userId = (req as any).user.id;
   const productId = req.params.productId;
   const existing = await db.query.favorites.findFirst({ 
     where: and(eq(schema.favorites.userId, userId), eq(schema.favorites.productId, productId)) 
@@ -1846,7 +1846,7 @@ app.post('/api/favorites/:productId', authenticateToken, async (req, res) => {
   res.json({ success: true });
 });
 app.delete('/api/favorites/:productId', authenticateToken, async (req, res) => {
-  const userId = req.user.id;
+  const userId = (req as any).user.id;
   await db.delete(schema.favorites).where(and(eq(schema.favorites.userId, userId), eq(schema.favorites.productId, req.params.productId)));
   res.json({ success: true });
 });
@@ -1922,6 +1922,63 @@ app.delete('/api/admin/faqs/:id', authenticateAdmin, requirePermission('content'
 });
 
 
+
+// ================= NEW ADMIN USERS APIS =================
+app.post('/api/admin/users/invite', authenticateAdmin, async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ code: 'INVALID_INPUT' });
+  
+  const existing = await db.query.users.findFirst({ where: eq(schema.users.email, email) });
+  if (existing) {
+    if (existing.role !== 'admin') {
+      await db.update(schema.users).set({ role: 'admin' }).where(eq(schema.users.id, existing.id));
+    }
+    return res.json({ success: true, message: 'Existing user upgraded to admin' });
+  }
+
+  const rawPassword = require('crypto').randomBytes(8).toString('hex');
+  const pepper = process.env.PASSWORD_SALT || '';
+  const hashedPassword = await bcrypt.hash(rawPassword + pepper, await bcrypt.genSalt(10));
+  
+  await db.insert(schema.users).values({
+    id: `usr_${require('uuid').v4().substring(0, 8)}`,
+    email,
+    passwordHash: hashedPassword,
+    role: 'admin',
+    tier: 'standard'
+  });
+  res.json({ success: true, message: 'Admin invited', tempPassword: rawPassword });
+});
+
+app.get('/api/admin/users', authenticateAdmin, async (req, res) => {
+  const usersList = await db.query.users.findMany({
+    orderBy: [desc(schema.users.createdAt)]
+  });
+  
+  // decrypt phone if needed, but not strictly required
+  usersList.forEach(u => {
+    if (u.phoneEncrypted) u.phoneEncrypted = decrypt(u.phoneEncrypted);
+    if (!Array.isArray(u.permissions)) u.permissions = [];
+  });
+  
+  res.json({ success: true, users: usersList });
+});
+
+app.patch('/api/admin/users/:id/role', authenticateAdmin, async (req, res) => {
+  await db.update(schema.users).set({ role: req.body.role }).where(eq(schema.users.id, req.params.id));
+  res.json({ success: true });
+});
+
+app.patch('/api/admin/users/:id/tier', authenticateAdmin, async (req, res) => {
+  await db.update(schema.users).set({ tier: req.body.tier }).where(eq(schema.users.id, req.params.id));
+  res.json({ success: true });
+});
+
+app.patch('/api/admin/users/:id/permissions', authenticateAdmin, async (req, res) => {
+  await db.update(schema.users).set({ permissions: req.body.permissions }).where(eq(schema.users.id, req.params.id));
+  res.json({ success: true });
+});
+
 // ================= NEW BATCH / EXPORT APIS =================
 
 // B端：商品批量操作 - 批量导出 (CSV)
@@ -1938,11 +1995,11 @@ app.get('/api/admin/products/export', authenticateAdmin, requirePermission('prod
 
 // B端：订单数据导出 (CSV)
 app.get('/api/admin/orders/export', authenticateAdmin, requirePermission('orders'), async (req, res) => {
-  const { status, startDate, endDate } = req.query;
+  const { status, startDate, endDate } = req.query as any;
   const conditions = [];
-  if (status) conditions.push(eq(schema.orders.status, status));
-  if (startDate) conditions.push(gte(schema.orders.createdAt, new Date(startDate)));
-  if (endDate) conditions.push(sql`created_at <= ${new Date(endDate)}`);
+  if (status) conditions.push(eq(schema.orders.status, status as any));
+  if (startDate) conditions.push(gte(schema.orders.createdAt, new Date(startDate) as any));
+  if (endDate) conditions.push(sql`created_at <= ${new Date(endDate) as any}`);
   
   const orderList = await db.query.orders.findMany({
     where: conditions.length > 0 ? and(...conditions) : undefined,
@@ -1960,7 +2017,7 @@ app.get('/api/admin/orders/export', authenticateAdmin, requirePermission('orders
 
 // 电子收据 (SDRS §6.10)
 app.get('/api/orders/:id/receipt', authenticateToken, async (req, res) => {
-  const userId = req.user.id;
+  const userId = (req as any).user.id;
   const order = await db.query.orders.findFirst({
     where: and(eq(schema.orders.id, req.params.id), eq(schema.orders.userId, userId)),
     with: { items: { with: { sku: { with: { product: true } } } } }

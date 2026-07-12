@@ -10,6 +10,7 @@ import CartView from './components/shop/CartView.tsx';
 import CheckoutView from './components/shop/CheckoutView.tsx';
 import PaymentView from './components/shop/PaymentView.tsx';
 import UserProfile from './components/shop/UserProfile.tsx';
+import PasswordReset from './components/shop/PasswordReset.tsx';
 import AuthView from './components/shop/AuthView.tsx';
 
 // Admin modules
@@ -20,6 +21,7 @@ import AdminMarketing from './components/admin/AdminMarketing.tsx';
 import AdminFeedback from './components/admin/AdminFeedback.tsx';
 import AdminSettings from './components/admin/AdminSettings.tsx';
 import AdminUsers from './components/admin/AdminUsers.tsx';
+import AdminCMS from './components/admin/AdminCMS.tsx';
 
 type ViewState = 'shop_home' | 'product_detail' | 'cart' | 'checkout' | 'payment' | 'profile';
 type AdminTab = 'dashboard' | 'products' | 'orders' | 'marketing' | 'feedback' | 'settings' | 'users';
