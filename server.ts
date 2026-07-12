@@ -497,7 +497,7 @@ app.get('/api/cart/:userId', authenticateToken, async (req, res) => {
   res.json(mapped);
 });
 
-app.post('/api/cart/items', authenticateToken, async (req, res) => {
+app.post('/api/cart/items', authenticateToken, async (req, res) => { console.log('POST /api/cart/items body:', req.body);
   const { skuId, qty } = req.body;
   const userId = (req as any).user.id;
   const cartId = `cart_${userId}`;
@@ -684,7 +684,8 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
 
   const orderId = `ord_${uuidv4().substring(0,8)}`;
   
-  await db.transaction(async (tx) => {
+  try {
+    await db.transaction(async (tx) => {
     
     // Check inventory and lock stock securely
     for (const item of items) {
@@ -742,11 +743,11 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
     await tx.delete(schema.cartItems).where(
       and(eq(schema.cartItems.cartId, `cart_${userId}`), inArray(schema.cartItems.skuId, items.map((i:any)=>i.skuId)))
     );
-  }).catch(e => {
+    });
+    return res.json({ success: true, orderId });
+  } catch (e: any) {
     return res.status(400).json({ code: 'ORDER_FAILED', message: e.message });
-  });
-
-  res.json({ success: true, orderId });
+  }
 });
 
 app.get('/api/orders/mine/:userId', authenticateToken, async (req, res) => {
@@ -1320,6 +1321,7 @@ app.post('/api/admin/init-db', async (req, res) => {
         "user_id" text REFERENCES "users"("id"),
         "token" text NOT NULL,
         "expires_at" timestamp NOT NULL,
+        "created_at" timestamp DEFAULT now(),
         "used" boolean DEFAULT false
       );
 
@@ -1556,36 +1558,7 @@ app.post('/api/auth/logout', authenticateToken, (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
-app.post('/api/cart/merge', authenticateToken, async (req, res) => {
-  const userId = (req as any).user.id;
-  const { localItems } = req.body;
-  if (!localItems || !Array.isArray(localItems)) return res.json({ success: true });
-  
-  let cart = await db.query.carts.findFirst({ where: eq(schema.carts.userId, userId) });
-  if (!cart) {
-    const cartId = 'cart_' + require('uuid').v4().substring(0, 8);
-    await db.insert(schema.carts).values({ id: cartId, userId });
-    cart = { id: cartId, userId, updatedAt: new Date() };
-  }
-  
-  for (const item of localItems) {
-    const existing = await db.query.cartItems.findFirst({
-      where: and(eq(schema.cartItems.cartId, cart.id), eq(schema.cartItems.skuId, item.skuId))
-    });
-    if (existing) {
-      await db.update(schema.cartItems).set({ qty: existing.qty + item.qty, checked: item.checked ?? existing.checked }).where(eq(schema.cartItems.id, existing.id));
-    } else {
-      await db.insert(schema.cartItems).values({
-        id: 'ci_' + require('uuid').v4().substring(0, 8),
-        cartId: cart.id,
-        skuId: item.skuId,
-        qty: item.qty,
-        checked: item.checked ?? true
-      });
-    }
-  }
-  res.json({ success: true });
-});
+
 
 app.get('/api/favorites', authenticateToken, async (req, res) => {
   const userId = (req as any).user.id;
@@ -1810,6 +1783,7 @@ app.post('/api/cart/merge', authenticateToken, async (req, res) => {
         const existing = await tx.query.cartItems.findFirst({
           where: and(eq(schema.cartItems.cartId, cartId), eq(schema.cartItems.skuId, item.skuId))
         });
+        if (!item.skuId || !item.qty) continue;
         if (existing) {
           await tx.update(schema.cartItems).set({ qty: existing.qty + item.qty }).where(eq(schema.cartItems.id, existing.id));
         } else {
