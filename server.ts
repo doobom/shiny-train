@@ -1,7 +1,7 @@
-import { migrate } from './src/server/db.js';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
 import 'dotenv/config';
+import { migrate } from './src/server/db.js';
 import express from 'express';
 import 'express-async-errors';
 import cors from 'cors';
@@ -1431,33 +1431,6 @@ app.get('/api/orders/:id/receipt', authenticateToken, async (req, res) => {
 });
 
 
-const isProduction = process.env.NODE_ENV === 'production' || (!process.env.NODE_ENV && !!process.env.DATABASE_URL);
-if (!isProduction) {
-  import('vite').then(async ({ createServer }) => {
-    const vite = await createServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-    migrate().then(() => {
-      app.listen(PORT, '0.0.0.0', () => {
-        console.log(`[Dev] Server running on http://localhost:${PORT}`);
-      });
-    }).catch(console.error);
-  });
-} else {
-  const distPath = require('path').join(process.cwd(), 'dist');
-  app.use(express.static(distPath));
-  app.get('*', (req, res) => {
-    res.sendFile(require('path').join(distPath, 'index.html'));
-  });
-  migrate().then(() => {
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`[Prod] Server running on port ${PORT}`);
-    });
-  }).catch(console.error);
-}
-
 // Batch operations
 app.post('/api/admin/products/batch-status', authenticateAdmin, async (req, res) => {
   const { productIds, status } = req.body;
@@ -1465,3 +1438,35 @@ app.post('/api/admin/products/batch-status', authenticateAdmin, async (req, res)
   await db.update(schema.products).set({ status }).where(inArray(schema.products.id, productIds));
   res.json({ success: true });
 });
+
+const isProduction = process.env.NODE_ENV === 'production' || (!process.env.NODE_ENV && !!process.env.DATABASE_URL);
+
+// Apply migrations
+migrate().then(() => {
+  console.log("Database migrated successfully.");
+}).catch((err) => {
+  console.error("Database migration failed:", err);
+  // Do not crash the server so the user can see the API still responds (e.g. for debugging)
+});
+
+if (!isProduction) {
+  import('vite').then(async ({ createServer }) => {
+    const vite = await createServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`[Dev] Server running on http://localhost:${PORT}`);
+    });
+  }).catch(console.error);
+} else {
+  const distPath = require('path').join(process.cwd(), 'dist');
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(require('path').join(distPath, 'index.html'));
+  });
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[Prod] Server running on port ${PORT}`);
+  });
+}
