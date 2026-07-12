@@ -109,6 +109,7 @@ setInterval(async () => {
     if (task) {
       if (process.env.RESEND_API_KEY) {
         try {
+
           await resend.emails.send({
             from: EMAIL_FROM,
             to: task.to,
@@ -1133,6 +1134,8 @@ app.post('/api/admin/reductions', authenticateAdmin, async (req, res) => {
 // Database initialization endpoint via curl
 app.post('/api/admin/init-db', async (req, res) => {
   try {
+    await db.execute(sql.raw(`ALTER TABLE "role_permissions" RENAME COLUMN "role_code" TO "role_id"`)).catch(() => {});
+    await db.execute(sql.raw(`ALTER TABLE "role_permissions" RENAME COLUMN "permission" TO "module"`)).catch(() => {});
     console.log("Forcing migration before seeding...");
     
     // Explicitly create tables if they do not exist
@@ -1368,8 +1371,8 @@ app.post('/api/admin/init-db', async (req, res) => {
 
       CREATE TABLE IF NOT EXISTS "role_permissions" (
         "id" text PRIMARY KEY NOT NULL,
-        "role_code" text REFERENCES "roles"("code"),
-        "permission" text NOT NULL
+        "role_id" text REFERENCES "roles"("id"),
+        "module" text NOT NULL
       );
       
       -- Shipping
@@ -1733,19 +1736,7 @@ app.put('/api/admin/faqs/:id', authenticateAdmin, async (req, res) => {
 });
 
 // Roles
-app.get('/api/admin/roles', authenticateAdmin, async (req, res) => {
-  const roles = await db.query.roles.findMany();
-  res.json(roles);
-});
-app.post('/api/admin/roles', authenticateAdmin, async (req, res) => {
-  const { code, nameZh, nameEn } = req.body;
-  const id = 'rol_' + require('uuid').v4().substring(0, 8);
-  await db.insert(schema.roles).values({ id, code, nameZh, nameEn });
-  res.json({ success: true, id });
-});
-app.get('/api/admin/permissions/catalog', authenticateAdmin, async (req, res) => {
-  res.json(['products', 'orders', 'users', 'marketing', 'settings']);
-});
+
 
 // 5. B/C 端：电子收据与导出 (Orders CSV & Receipts)
 app.get('/api/admin/orders/export', authenticateAdmin, async (req, res) => {
@@ -1759,28 +1750,7 @@ app.get('/api/admin/orders/export', authenticateAdmin, async (req, res) => {
   res.send(csv);
 });
 
-app.get('/api/orders/:id/receipt', authenticateToken, async (req, res) => {
-  const orderId = req.params.id;
-  const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, orderId) });
-  if (!order) return res.status(404).send('Order not found');
-  
-  const html = `
-    <html>
-      <head><title>Receipt ${order.id}</title></head>
-      <body style="font-family: sans-serif; padding: 40px; text-align: center;">
-        <h1 style="color: #333;">Receipt</h1>
-        <div style="text-align: left; max-width: 400px; margin: 0 auto; border: 1px solid #eee; padding: 20px;">
-          <p><strong>Order ID:</strong> ${order.id}</p>
-          <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString()}</p>
-          <p><strong>Total:</strong> HK$ ${(order.totalCents / 100).toFixed(2)}</p>
-          <p><strong>Status:</strong> ${order.status}</p>
-        </div>
-        <button onclick="window.print()" style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">Print Receipt</button>
-      </body>
-    </html>
-  `;
-  res.send(html);
-});
+
 
 
 // Batch operations
@@ -2054,30 +2024,23 @@ app.get('/api/orders/:id/receipt', authenticateToken, async (req, res) => {
   if (!order) return res.status(404).json({ code: 'NOT_FOUND', message: 'Order not found.' });
   if (order.status === 'pending_payment') return res.status(400).json({ code: 'NOT_PAID', message: 'Order not paid.' });
   
-  let html = `
-    <html>
-      <body style="font-family: sans-serif; padding: 20px;">
-        <h2>Electronic Receipt</h2>
-        <p><strong>Order ID:</strong> ${order.id}</p>
-        <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString()}</p>
-        <hr />
-        <ul>
-  `;
-  for (const item of order.items) {
-    html += `<li>${item.sku?.product?.nameEn || 'Item'} x${item.qty} - HK$ ${((item.priceCents * item.qty) / 100).toFixed(2)}</li>`;
-  }
-  html += `
-        </ul>
-        <hr />
-        <p><strong>Subtotal:</strong> HK$ ${(order.totalCents / 100).toFixed(2)}</p>
-        <p><strong>Shipping:</strong> HK$ ${(order.shippingFeeCents / 100).toFixed(2)}</p>
-        <p><strong>Discount:</strong> -HK$ ${(order.discountCents / 100).toFixed(2)}</p>
-        <h3><strong>Total:</strong> HK$ ${(order.grandTotalCents / 100).toFixed(2)}</h3>
-        <button onclick="window.print()" style="margin-top:20px;">Print</button>
-      </body>
-    </html>
-  `;
-  res.send(html);
+  const user = await db.query.users.findFirst({ where: eq(schema.users.id, userId) });
+  
+  res.json({
+    success: true,
+    receipt: {
+      company: 'Shiny Train HK',
+      taxId: '88888888-000',
+      orderNo: order.id,
+      date: order.createdAt,
+      customerName: user?.email || 'Customer',
+      items: order.items.map(i => ({ skuId: i.sku?.product?.nameEn || i.skuId, qty: i.qty, unitPrice: i.priceCents })),
+      subtotal: order.totalCents,
+      shippingFee: order.shippingFeeCents,
+      discount: order.discountCents,
+      grandTotal: order.grandTotalCents
+    }
+  });
 });
 
 

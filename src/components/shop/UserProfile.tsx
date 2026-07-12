@@ -414,6 +414,11 @@ export default function UserProfile({ userId, locale }: UserProfileProps) {
                     }`}>
                       {order.status.toUpperCase()}
                     </span>
+                    {(order.status === 'completed' || order.status === 'paid' || order.status === 'shipped') && (
+                      <button onClick={() => downloadReceipt(order.id)} className="text-[10px] font-bold text-neutral-600 hover:text-neutral-900 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded">
+                        {locale === 'zh-HK' ? '下載收據' : 'Receipt'}
+                      </button>
+                    )}
                   </div>
                 </div>
 

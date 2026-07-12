@@ -30,7 +30,7 @@ export default function App() {
   const [locale, setLocale] = useState<Locale>('zh-HK');
   // @ts-ignore
   const appMode = import.meta.env.VITE_APP_MODE || 'both'; // 'user' | 'admin' | 'both'
-  const [isAdminMode, setIsAdminMode] = useState<boolean>(appMode === 'admin');
+  const [isAdminMode, setIsAdminMode] = useState<boolean>(appMode === 'admin' || window.location.search.includes('mode=admin'));
   const [currentView, setCurrentView] = useState<ViewState>('shop_home');
   const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('dashboard');
 
