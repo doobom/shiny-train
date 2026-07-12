@@ -1251,13 +1251,14 @@ app.post('/api/cart/merge', authenticateToken, async (req, res) => {
       where: and(eq(schema.cartItems.cartId, cart.id), eq(schema.cartItems.skuId, item.skuId))
     });
     if (existing) {
-      await db.update(schema.cartItems).set({ qty: existing.qty + item.qty }).where(eq(schema.cartItems.id, existing.id));
+      await db.update(schema.cartItems).set({ qty: existing.qty + item.qty, checked: item.checked ?? existing.checked }).where(eq(schema.cartItems.id, existing.id));
     } else {
       await db.insert(schema.cartItems).values({
         id: 'ci_' + require('uuid').v4().substring(0, 8),
         cartId: cart.id,
         skuId: item.skuId,
-        qty: item.qty
+        qty: item.qty,
+        checked: item.checked ?? true
       });
     }
   }

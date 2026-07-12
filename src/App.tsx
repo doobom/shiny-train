@@ -63,8 +63,6 @@ export default function App() {
     localStorage.setItem('user', JSON.stringify(user));
     setUserId(user.id);
     setUserEmail(user.email);
-    setTokenReady(true);
-    
     // Automatically switch to admin mode if the user is an admin and appMode isn't strictly 'user'
     if (user.role === 'admin' && appMode !== 'user') {
       setIsAdminMode(true);
@@ -81,8 +79,14 @@ export default function App() {
       .then(() => {
         localStorage.removeItem('localCart');
         fetchCartCount(user.id);
+        setTokenReady(true);
       })
-      .catch(console.error);
+      .catch(e => {
+        console.error(e);
+        setTokenReady(true);
+      });
+    } else {
+      setTokenReady(true);
     }
   };
   
@@ -96,14 +100,14 @@ export default function App() {
     setCurrentView('shop_home');
   };
 
-  const fetchCartCount = () => {
+  const fetchCartCount = (uid?: string) => {
     if (!tokenReady) {
       const localCart = JSON.parse(localStorage.getItem('localCart') || '[]');
       const total = localCart.reduce((sum: number, item: any) => sum + item.qty, 0);
       setCartCount(total);
       return;
     }
-    apiFetch(`/api/cart/${userId}`)
+    apiFetch(`/api/cart/${uid || userId}`)
       .then(res => res.json())
       .then(data => {
         const total = (data || []).reduce((sum: number, item: any) => sum + item.qty, 0);
