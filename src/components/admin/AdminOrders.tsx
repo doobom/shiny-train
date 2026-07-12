@@ -186,7 +186,17 @@ export default function AdminOrders({ locale }: AdminOrdersProps) {
       )}
 
       <button onClick={() => {
-        window.open('/api/admin/orders/export?token=' + localStorage.getItem('token'), '_blank');
+        
+    const csv = 'OrderID,Status,UserId,TotalCents,CreatedAt\n' + orders.map(o => `"${o.id}","${o.status}","${o.userId}","${o.grandTotalCents}","${o.createdAt}"`).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'orders.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
       }} className="bg-gray-900 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-800 absolute right-6 top-6">
         Export CSV
       </button>

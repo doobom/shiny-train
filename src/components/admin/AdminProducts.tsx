@@ -131,6 +131,24 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
     }).then(() => fetchCatalog());
   };
   
+  const handleBatchDiscount = () => {
+    if (!selectedProductIds.length) return;
+    const discountStr = prompt(locale === 'zh-HK' ? '输入折扣百分比 (例如输入10表示打9折)' : 'Enter discount percentage (e.g. 10 for 10% off)');
+    if (!discountStr) return;
+    const discountPercent = Number(discountStr);
+    if (isNaN(discountPercent) || discountPercent <= 0 || discountPercent > 100) return alert('Invalid discount');
+    apiFetch('/api/admin/products/batch-discount', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productIds: selectedProductIds, discountPercent })
+    }).then(() => {
+      setNotif(locale === 'zh-HK' ? '批量折扣设置成功' : 'Batch discount applied');
+      setSelectedProductIds([]);
+      fetchCatalog();
+      setTimeout(() => setNotif(null), 3000);
+    });
+  };
+
   const handleBatchStatus = (status: 'on_shelf' | 'off_shelf') => {
     if (!selectedProductIds.length) return;
     apiFetch('/api/admin/products/batch-status', {

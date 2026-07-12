@@ -4,6 +4,43 @@ import { Locale, Banner, Announcement, FAQ } from '../../types';
 import { Image, Volume2, HelpCircle, PlusCircle, Trash } from 'lucide-react';
 
 export default function AdminCMS({ locale }: { locale: Locale }) {
+  const dict = {
+    'zh-HK': {
+      banners: '橫幅管理',
+      announcements: '公告管理',
+      faqs: '常見問題',
+      addBanner: '新增橫幅',
+      imgUrl: '圖片網址',
+      linkUrl: '連結網址',
+      addBtn: '新增',
+      addAnn: '新增公告',
+      titleZh: '標題 (中文)',
+      titleEn: '標題 (英文)',
+      addFaq: '新增常見問題',
+      qZh: '問題 (中文)',
+      qEn: '問題 (英文)',
+      aZh: '答案 (中文)',
+      aEn: '答案 (英文)',
+    },
+    'en': {
+      banners: 'Banners',
+      announcements: 'Announcements',
+      faqs: 'FAQs',
+      addBanner: 'Add Banner',
+      imgUrl: 'Image URL',
+      linkUrl: 'Link URL',
+      addBtn: 'Add',
+      addAnn: 'Add Announcement',
+      titleZh: 'Title (ZH)',
+      titleEn: 'Title (EN)',
+      addFaq: 'Add FAQ',
+      qZh: 'Question (ZH)',
+      qEn: 'Question (EN)',
+      aZh: 'Answer (ZH)',
+      aEn: 'Answer (EN)',
+    }
+  }[locale];
+
   const [activeTab, setActiveTab] = useState<'banners' | 'announcements' | 'faqs'>('banners');
   
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -90,23 +127,23 @@ export default function AdminCMS({ locale }: { locale: Locale }) {
     <div className="space-y-6">
       <div className="flex space-x-2">
         <button onClick={() => setActiveTab('banners')} className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'banners' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'}`}>
-          <Image className="inline w-3.5 h-3.5 mr-1" /> Banners
+          <Image className="inline w-3.5 h-3.5 mr-1" /> {dict.banners}
         </button>
         <button onClick={() => setActiveTab('announcements')} className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'announcements' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'}`}>
-          <Volume2 className="inline w-3.5 h-3.5 mr-1" /> Announcements
+          <Volume2 className="inline w-3.5 h-3.5 mr-1" /> {dict.announcements}
         </button>
         <button onClick={() => setActiveTab('faqs')} className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'faqs' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'}`}>
-          <HelpCircle className="inline w-3.5 h-3.5 mr-1" /> FAQs
+          <HelpCircle className="inline w-3.5 h-3.5 mr-1" /> {dict.faqs}
         </button>
       </div>
 
       {activeTab === 'banners' && (
         <div className="bg-white p-5 rounded-xl border border-gray-200">
-          <h3 className="font-bold mb-4">Add Banner</h3>
+          <h3 className="font-bold mb-4">{dict.addBanner}</h3>
           <form onSubmit={addBanner} className="flex gap-2 mb-6">
-            <input placeholder="Image URL" value={newBannerImg} onChange={e=>setNewBannerImg(e.target.value)} required className="border p-2 rounded-lg text-xs flex-1" />
-            <input placeholder="Link URL" value={newBannerLink} onChange={e=>setNewBannerLink(e.target.value)} className="border p-2 rounded-lg text-xs flex-1" />
-            <button className="bg-neutral-900 text-white px-4 rounded-lg text-xs font-bold"><PlusCircle className="inline w-4 h-4" /> Add</button>
+            <input placeholder={dict.imgUrl} value={newBannerImg} onChange={e=>setNewBannerImg(e.target.value)} required className="border p-2 rounded-lg text-xs flex-1" />
+            <input placeholder={dict.linkUrl} value={newBannerLink} onChange={e=>setNewBannerLink(e.target.value)} className="border p-2 rounded-lg text-xs flex-1" />
+            <button className="bg-neutral-900 text-white px-4 rounded-lg text-xs font-bold"><PlusCircle className="inline w-4 h-4 mr-1" /> {dict.addBtn}</button>
           </form>
           <div className="grid grid-cols-2 gap-4">
             {banners.map(b => (
@@ -121,11 +158,11 @@ export default function AdminCMS({ locale }: { locale: Locale }) {
 
       {activeTab === 'announcements' && (
         <div className="bg-white p-5 rounded-xl border border-gray-200">
-          <h3 className="font-bold mb-4">Add Announcement</h3>
+          <h3 className="font-bold mb-4">{dict.addAnn}</h3>
           <form onSubmit={addAnnouncement} className="flex gap-2 mb-6">
-            <input placeholder="Title (ZH)" value={newAnnTitleZh} onChange={e=>setNewAnnTitleZh(e.target.value)} required className="border p-2 rounded-lg text-xs flex-1" />
-            <input placeholder="Title (EN)" value={newAnnTitleEn} onChange={e=>setNewAnnTitleEn(e.target.value)} required className="border p-2 rounded-lg text-xs flex-1" />
-            <button className="bg-neutral-900 text-white px-4 rounded-lg text-xs font-bold"><PlusCircle className="inline w-4 h-4" /> Add</button>
+            <input placeholder={dict.titleZh} value={newAnnTitleZh} onChange={e=>setNewAnnTitleZh(e.target.value)} required className="border p-2 rounded-lg text-xs flex-1" />
+            <input placeholder={dict.titleEn} value={newAnnTitleEn} onChange={e=>setNewAnnTitleEn(e.target.value)} required className="border p-2 rounded-lg text-xs flex-1" />
+            <button className="bg-neutral-900 text-white px-4 rounded-lg text-xs font-bold"><PlusCircle className="inline w-4 h-4 mr-1" /> {dict.addBtn}</button>
           </form>
           <div className="space-y-2">
             {announcements.map(a => (
@@ -143,14 +180,14 @@ export default function AdminCMS({ locale }: { locale: Locale }) {
 
       {activeTab === 'faqs' && (
         <div className="bg-white p-5 rounded-xl border border-gray-200">
-          <h3 className="font-bold mb-4">Add FAQ</h3>
+          <h3 className="font-bold mb-4">{dict.addFaq}</h3>
           <form onSubmit={addFaq} className="grid grid-cols-2 gap-4 mb-6">
-            <input placeholder="Question (ZH)" value={newFaqQZh} onChange={e=>setNewFaqQZh(e.target.value)} required className="border p-2 rounded-lg text-xs" />
-            <input placeholder="Question (EN)" value={newFaqQEn} onChange={e=>setNewFaqQEn(e.target.value)} required className="border p-2 rounded-lg text-xs" />
-            <input placeholder="Answer (ZH)" value={newFaqAZh} onChange={e=>setNewFaqAZh(e.target.value)} required className="border p-2 rounded-lg text-xs" />
-            <input placeholder="Answer (EN)" value={newFaqAEn} onChange={e=>setNewFaqAEn(e.target.value)} required className="border p-2 rounded-lg text-xs" />
+            <input placeholder={dict.qZh} value={newFaqQZh} onChange={e=>setNewFaqQZh(e.target.value)} required className="border p-2 rounded-lg text-xs" />
+            <input placeholder={dict.qEn} value={newFaqQEn} onChange={e=>setNewFaqQEn(e.target.value)} required className="border p-2 rounded-lg text-xs" />
+            <input placeholder={dict.aZh} value={newFaqAZh} onChange={e=>setNewFaqAZh(e.target.value)} required className="border p-2 rounded-lg text-xs" />
+            <input placeholder={dict.aEn} value={newFaqAEn} onChange={e=>setNewFaqAEn(e.target.value)} required className="border p-2 rounded-lg text-xs" />
             <div className="col-span-2 text-right">
-              <button className="bg-neutral-900 text-white px-6 py-2 rounded-lg text-xs font-bold"><PlusCircle className="inline w-4 h-4 mr-1" /> Add FAQ</button>
+              <button className="bg-neutral-900 text-white px-6 py-2 rounded-lg text-xs font-bold"><PlusCircle className="inline w-4 h-4 mr-1" /> {dict.addFaq}</button>
             </div>
           </form>
           <div className="space-y-4">

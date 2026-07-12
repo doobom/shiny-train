@@ -49,9 +49,9 @@ export async function seedDatabase() {
     catId3 = `cat_${uuidv4().substring(0, 8)}`;
     
     await db.insert(schema.categories).values([
-      { id: catId1, nameZh: '電子產品', nameEn: 'Electronics', sort: 1 },
-      { id: catId2, nameZh: '家居生活', nameEn: 'Home Living', sort: 2 },
-      { id: catId3, nameZh: '運動配件', nameEn: 'Sports', sort: 3 }
+      { id: catId1, nameZh: '電子產品', nameEn: 'Electronics', sort: 1, disabled: false },
+      { id: catId2, nameZh: '家居生活', nameEn: 'Home Living', sort: 2, disabled: false },
+      { id: catId3, nameZh: '運動配件', nameEn: 'Sports', sort: 3, disabled: false }
     ]);
     console.log('Categories created.');
 
@@ -69,6 +69,9 @@ export async function seedDatabase() {
         priceOriginalCents: 29900,
         priceAfterCents: 19900,
         categoryId: catId1,
+        status: 'on_shelf',
+        createdAt: new Date(),
+        updatedAt: new Date(),
         images: ['https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=500&q=80']
       },
       {
@@ -80,6 +83,9 @@ export async function seedDatabase() {
         priceOriginalCents: 89900,
         priceAfterCents: 59900,
         categoryId: catId1,
+        status: 'on_shelf',
+        createdAt: new Date(),
+        updatedAt: new Date(),
         images: ['https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=500&q=80']
       }
     ]);

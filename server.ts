@@ -1169,7 +1169,7 @@ app.post('/api/admin/init-db', async (req, res) => {
         "price_after_cents" integer NOT NULL,
         "category_id" text REFERENCES "categories"("id"),
         "status" text DEFAULT 'on_shelf',
-        "image_urls" jsonb DEFAULT '[]',
+        "images" jsonb DEFAULT '[]',
         "created_at" timestamp DEFAULT now(),
         "updated_at" timestamp DEFAULT now()
       );
@@ -1406,7 +1406,7 @@ app.post('/api/admin/init-db', async (req, res) => {
       await db.execute(sql.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS locale VARCHAR(20) DEFAULT 'zh-HK'`));
       await db.execute(sql.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'`));
       await db.execute(sql.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_encrypted VARCHAR(255)`));
-      await db.execute(sql.raw(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_urls JSONB DEFAULT '[]'`));
+      await db.execute(sql.raw(`ALTER TABLE products ADD COLUMN IF NOT EXISTS images JSONB DEFAULT '[]'`));
       await db.execute(sql.raw(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS link_url VARCHAR(255)`));
       await db.execute(sql.raw(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS disabled BOOLEAN DEFAULT FALSE`));
     } catch(e) {
@@ -1793,6 +1793,35 @@ app.post('/api/admin/products/batch-status', authenticateAdmin, async (req, res)
 
 const isProduction = process.env.NODE_ENV === 'production' || (!process.env.NODE_ENV && !!process.env.DATABASE_URL);
 
+
+
+app.post('/api/admin/products/batch-discount', authenticateAdmin, async (req, res) => {
+  const { productIds, discountPercent } = req.body;
+  if (!productIds || !productIds.length || typeof discountPercent !== 'number') return res.json({ success: true });
+  
+  const productList = await db.query.products.findMany({ where: inArray(schema.products.id, productIds) });
+  await db.transaction(async (tx) => {
+    for (const p of productList) {
+      const newPrice = Math.floor(p.priceOriginalCents * ((100 - discountPercent) / 100));
+      await tx.update(schema.products).set({ priceAfterCents: newPrice }).where(eq(schema.products.id, p.id));
+    }
+  });
+  res.json({ success: true });
+});
+
+app.post('/api/admin/discounts', authenticateAdmin, async (req, res) => {
+  const id = `dsc_${require('uuid').v4().substring(0,8)}`;
+  await db.insert(schema.discounts).values({ id, ...req.body });
+  res.json({ success: true, id });
+});
+app.patch('/api/admin/discounts/:id', authenticateAdmin, async (req, res) => {
+  await db.update(schema.discounts).set(req.body).where(eq(schema.discounts.id, req.params.id));
+  res.json({ success: true });
+});
+app.delete('/api/admin/discounts/:id', authenticateAdmin, async (req, res) => {
+  await db.delete(schema.discounts).where(eq(schema.discounts.id, req.params.id));
+  res.json({ success: true });
+});
 
 // ================= NEW APIS =================
 

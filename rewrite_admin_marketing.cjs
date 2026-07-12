@@ -1,4 +1,6 @@
-import { fetchWithAuth as apiFetch } from '../../utils/api';
+const fs = require('fs');
+
+const code = `import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { Tag, PlusCircle, AlertCircle, Percent, Check, Calendar, Trash2 } from 'lucide-react';
 import { Locale, Category } from '../../types/index.ts';
@@ -122,13 +124,13 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
       <div className="flex gap-4 border-b border-gray-100 mb-6">
         <button 
           onClick={() => setActiveTab('reductions')} 
-          className={`pb-2 px-1 text-sm font-bold ${activeTab === 'reductions' ? 'text-neutral-900 border-b-2 border-neutral-900' : 'text-gray-400 hover:text-gray-600'}`}
+          className={\`pb-2 px-1 text-sm font-bold \${activeTab === 'reductions' ? 'text-neutral-900 border-b-2 border-neutral-900' : 'text-gray-400 hover:text-gray-600'}\`}
         >
           {locale === 'zh-HK' ? '滿減活動' : 'Full Reductions'}
         </button>
         <button 
           onClick={() => setActiveTab('coupons')} 
-          className={`pb-2 px-1 text-sm font-bold ${activeTab === 'coupons' ? 'text-neutral-900 border-b-2 border-neutral-900' : 'text-gray-400 hover:text-gray-600'}`}
+          className={\`pb-2 px-1 text-sm font-bold \${activeTab === 'coupons' ? 'text-neutral-900 border-b-2 border-neutral-900' : 'text-gray-400 hover:text-gray-600'}\`}
         >
           {locale === 'zh-HK' ? '優惠碼' : 'Coupon Codes'}
         </button>
@@ -222,10 +224,10 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
                   {reductions.map(rule => (
                     <tr key={rule.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="p-4"><span className="font-bold text-gray-950 block">{locale === 'zh-HK' ? rule.nameZh : rule.nameEn}</span></td>
-                      <td className="p-4 font-mono font-bold text-gray-900">HK${(rule.thresholdCents / 100).toFixed(2)}</td>
-                      <td className="p-4 font-mono font-bold text-amber-600">-HK${(rule.reductionCents / 100).toFixed(2)}</td>
+                      <td className="p-4 font-mono font-bold text-gray-900">HK\${(rule.thresholdCents / 100).toFixed(2)}</td>
+                      <td className="p-4 font-mono font-bold text-amber-600">-HK\${(rule.reductionCents / 100).toFixed(2)}</td>
                       <td className="p-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${rule.stackable ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                        <span className={\`px-2 py-0.5 rounded text-[10px] font-bold \${rule.stackable ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-600'}\`}>
                           {rule.stackable ? 'YES' : 'NO'}
                         </span>
                       </td>
@@ -303,11 +305,11 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
                       <td className="p-4"><span className="font-bold text-gray-950 font-mono tracking-wider bg-gray-100 px-2 py-1 rounded">{d.code}</span></td>
                       <td className="p-4 uppercase text-[10px]">{d.type}</td>
                       <td className="p-4 font-mono font-bold text-amber-600">
-                        {d.type === 'percentage' ? `${d.value}%` : `-HK${(d.value / 100).toFixed(2)}`}
+                        {d.type === 'percentage' ? \`\${d.value}%\` : \`-HK\${(d.value / 100).toFixed(2)}\`}
                       </td>
-                      <td className="p-4 font-mono text-gray-500">{d.minOrderValueCents ? `HK${(d.minOrderValueCents / 100).toFixed(2)}` : 'None'}</td>
+                      <td className="p-4 font-mono text-gray-500">{d.minOrderValueCents ? \`HK\${(d.minOrderValueCents / 100).toFixed(2)}\` : 'None'}</td>
                       <td className="p-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${d.active ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                        <span className={\`px-2 py-0.5 rounded text-[10px] font-bold \${d.active ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}\`}>
                           {d.active ? 'YES' : 'NO'}
                         </span>
                       </td>
@@ -330,3 +332,5 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
     </div>
   );
 }
+`;
+fs.writeFileSync('src/components/admin/AdminMarketing.tsx', code);
