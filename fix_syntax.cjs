@@ -1,24 +1,27 @@
 const fs = require('fs');
-let code = fs.readFileSync('server.ts', 'utf8');
+let code = fs.readFileSync('src/components/shop/ProductDetail.tsx', 'utf8');
 
-const updated = `
-if (process.env.NODE_ENV !== 'production') {
-  import('vite').then(async ({ createServer }) => {
-    const vite = await createServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(\`[Dev] Server running on http://localhost:\${PORT}\`);
-    });
-  });
-} else {
-`;
+const target = `  const handleInstantBuy = () => {
+    if (quantity > 5) {
+      setErr(dict.limitExceeded);
+      return;
+    }
+    onInstantBuy(selectedSpec.id, quantity);
+  
+    if (quantity > 5) {
+      setErr(dict.limitExceeded);
+      return;
+    }
+    onInstantBuy(selectedSpec.id, quantity);
+  };`;
 
-code = code.replace(
-  /  app\.listen\(PORT, '0\.0\.0\.0', \(\) => \{\n      console\.log\(`\[Dev\] Server running on http:\/\/localhost:\$\{PORT\}`\);\n    \}\);\n  \}\);\n\} else \{/m,
-  updated.trim() + ' {'
-);
+const replace = `  const handleInstantBuy = () => {
+    if (quantity > 5) {
+      setErr(dict.limitExceeded);
+      return;
+    }
+    onInstantBuy(selectedSpec.id, quantity);
+  };`;
 
-fs.writeFileSync('server.ts', code);
+code = code.replace(target, replace);
+fs.writeFileSync('src/components/shop/ProductDetail.tsx', code);

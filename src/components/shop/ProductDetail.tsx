@@ -86,8 +86,28 @@ export default function ProductDetail({
   }[locale];
 
   const handleAddToCart = () => {
+    if (quantity > 5) {
+      setErr(dict.limitExceeded);
+      return;
+    }
+
     if (!userId) {
-      onRequestLogin();
+      // Local Cart
+      const localCart = JSON.parse(localStorage.getItem('localCart') || '[]');
+      const existing = localCart.find((i: any) => i.skuId === selectedSpec.id);
+      if (existing) {
+        existing.qty += quantity;
+      } else {
+        localCart.push({
+          skuId: selectedSpec.id,
+          qty: quantity,
+          addedAt: new Date().toISOString()
+        });
+      }
+      localStorage.setItem('localCart', JSON.stringify(localCart));
+      setNotification(dict.addedToCart);
+      onAddToCart();
+      setTimeout(() => setNotification(null), 3000);
       return;
     }
     if (quantity > 5) {
@@ -118,10 +138,6 @@ export default function ProductDetail({
   };
 
   const handleInstantBuy = () => {
-    if (!userId) {
-      onRequestLogin();
-      return;
-    }
     if (quantity > 5) {
       setErr(dict.limitExceeded);
       return;

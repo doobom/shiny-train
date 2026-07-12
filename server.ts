@@ -1098,6 +1098,8 @@ app.post('/api/admin/reductions', authenticateAdmin, async (req, res) => {
 // Database initialization endpoint via curl
 app.post('/api/admin/init-db', async (req, res) => {
   try {
+    console.log("Forcing migration before seeding...");
+    await migrate();
     await seedDatabase();
     res.json({ success: true, message: 'Database initialized successfully via API.' });
   } catch (error: any) {
@@ -1689,6 +1691,56 @@ app.post('/api/admin/roles/:id/permissions', authenticateAdmin, async (req, res)
 });
 app.delete('/api/admin/roles/:id/permissions/:permId', authenticateAdmin, async (req, res) => {
   await db.delete(schema.rolePermissions).where(eq(schema.rolePermissions.id, req.params.permId));
+  res.json({ success: true });
+});
+
+// ================= NEW CART LOCAL RESOLVE =================
+app.post('/api/cart/local-resolve', async (req, res) => {
+  const { localItems } = req.body;
+  if (!localItems || !localItems.length) return res.json([]);
+  
+  const itemsWithDetails = [];
+  for (let i = 0; i < localItems.length; i++) {
+    const item = localItems[i];
+    const spec = await db.query.productSpecs.findFirst({
+      where: eq(schema.productSpecs.id, item.skuId)
+    });
+    if (spec) {
+      const product = await db.query.products.findFirst({
+        where: eq(schema.products.id, spec.productId)
+      });
+      itemsWithDetails.push({
+        id: 'local_' + i,
+        cartId: 'local',
+        skuId: item.skuId,
+        qty: item.qty,
+        checked: item.checked !== false,
+        spec,
+        product
+      });
+    }
+  }
+  res.json(itemsWithDetails);
+});
+
+// ================= NEW MEMBER TIERS CRUD APIS =================
+app.get('/api/admin/tiers', authenticateAdmin, async (req, res) => {
+  const allTiers = await db.query.memberLevels.findMany({
+    orderBy: [asc(schema.memberLevels.minSpendCents)]
+  });
+  res.json({ success: true, tiers: allTiers });
+});
+app.post('/api/admin/tiers', authenticateAdmin, async (req, res) => {
+  const newId = `tier_${uuidv4().substring(0,8)}`;
+  await db.insert(schema.memberLevels).values({ id: newId, ...req.body });
+  res.json({ success: true, id: newId });
+});
+app.patch('/api/admin/tiers/:id', authenticateAdmin, async (req, res) => {
+  await db.update(schema.memberLevels).set(req.body).where(eq(schema.memberLevels.id, req.params.id));
+  res.json({ success: true });
+});
+app.delete('/api/admin/tiers/:id', authenticateAdmin, async (req, res) => {
+  await db.delete(schema.memberLevels).where(eq(schema.memberLevels.id, req.params.id));
   res.json({ success: true });
 });
 // Apply migrations

@@ -69,6 +69,21 @@ export default function App() {
     if (user.role === 'admin' && appMode !== 'user') {
       setIsAdminMode(true);
     }
+    
+    // Merge local cart
+    const localCart = JSON.parse(localStorage.getItem('localCart') || '[]');
+    if (localCart.length > 0) {
+      fetch('/api/cart/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ userId: user.id, localItems: localCart })
+      })
+      .then(() => {
+        localStorage.removeItem('localCart');
+        fetchCartCount(user.id);
+      })
+      .catch(console.error);
+    }
   };
   
   const handleLogout = () => {
@@ -82,7 +97,12 @@ export default function App() {
   };
 
   const fetchCartCount = () => {
-    if (!tokenReady) return;
+    if (!tokenReady) {
+      const localCart = JSON.parse(localStorage.getItem('localCart') || '[]');
+      const total = localCart.reduce((sum: number, item: any) => sum + item.qty, 0);
+      setCartCount(total);
+      return;
+    }
     apiFetch(`/api/cart/${userId}`)
       .then(res => res.json())
       .then(data => {
@@ -93,10 +113,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (tokenReady) {
-      fetchCartCount();
-    }
-  }, [tokenReady, userId]);
+    fetchCartCount();
+  }, [tokenReady, userId, currentView]);
 
   // Handle direct buy triggers
   const handleDirectBuy = (orderId: string) => {
@@ -275,7 +293,7 @@ export default function App() {
 
       {/* Main Content Space */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8">
-        {!tokenReady && (isAdminMode || !['shop_home', 'product_detail'].includes(currentView)) ? (
+        {!tokenReady && (isAdminMode || !['shop_home', 'product_detail', 'cart'].includes(currentView)) ? (
           <AuthView onLoginSuccess={handleLoginSuccess} />
         ) : !isAdminMode ? (
           // Renders C-End Customer shopping screens
@@ -298,6 +316,21 @@ export default function App() {
                   fetchCartCount();
                 }}
                 onInstantBuy={(skuId, qty) => {
+                  if (!userId) {
+                    const localCart = JSON.parse(localStorage.getItem('localCart') || '[]');
+                    const existing = localCart.find((i: any) => i.skuId === skuId);
+                    if (existing) {
+                      existing.qty += qty;
+                      existing.checked = true;
+                    } else {
+                      localCart.push({ skuId, qty, addedAt: new Date().toISOString(), checked: true });
+                    }
+                    localStorage.setItem('localCart', JSON.stringify(localCart));
+                    fetchCartCount();
+                    setCurrentView('checkout');
+                    return;
+                  }
+                  
                   apiFetch('/api/cart', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

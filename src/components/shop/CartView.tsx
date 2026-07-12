@@ -16,6 +16,30 @@ export default function CartView({ locale, userId, onGoToCheckout, onSelectProdu
 
   const fetchCart = () => {
     setLoading(true);
+    if (!userId) {
+      const localCart = JSON.parse(localStorage.getItem('localCart') || '[]');
+      if (localCart.length === 0) {
+        setItems([]);
+        setLoading(false);
+        return;
+      }
+      fetch('/api/cart/local-resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ localItems: localCart })
+      })
+      .then(res => res.json())
+      .then(data => {
+        setItems(data);
+        setLoading(false);
+      })
+      .catch(e => {
+        console.error(e);
+        setLoading(false);
+      });
+      return;
+    }
+    
     apiFetch(`/api/cart/${userId}`)
       .then(res => res.json())
       .then(data => {
@@ -33,6 +57,17 @@ export default function CartView({ locale, userId, onGoToCheckout, onSelectProdu
   }, [userId]);
 
   const updateItem = (itemId: string, qty?: number, checked?: boolean) => {
+    if (!userId && String(itemId).startsWith('local_')) {
+      const idx = parseInt(itemId.replace('local_', ''));
+      const localCart = JSON.parse(localStorage.getItem('localCart') || '[]');
+      if (localCart[idx]) {
+        if (qty !== undefined) localCart[idx].qty = qty;
+        if (checked !== undefined) localCart[idx].checked = checked;
+        localStorage.setItem('localCart', JSON.stringify(localCart));
+        fetchCart();
+      }
+      return;
+    }
     apiFetch(`/api/cart/items/${itemId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -44,6 +79,14 @@ export default function CartView({ locale, userId, onGoToCheckout, onSelectProdu
   };
 
   const deleteItem = (itemId: string) => {
+    if (!userId && String(itemId).startsWith('local_')) {
+      const idx = parseInt(itemId.replace('local_', ''));
+      let localCart = JSON.parse(localStorage.getItem('localCart') || '[]');
+      localCart.splice(idx, 1);
+      localStorage.setItem('localCart', JSON.stringify(localCart));
+      fetchCart();
+      return;
+    }
     apiFetch(`/api/cart/items/${itemId}`, {
       method: 'DELETE'
     })
@@ -54,6 +97,13 @@ export default function CartView({ locale, userId, onGoToCheckout, onSelectProdu
 
 
   const handleSelectAll = (checked: boolean) => {
+    if (!userId) {
+      let localCart = JSON.parse(localStorage.getItem('localCart') || '[]');
+      localCart = localCart.map((i: any) => ({ ...i, checked }));
+      localStorage.setItem('localCart', JSON.stringify(localCart));
+      fetchCart();
+      return;
+    }
     apiFetch('/api/cart/batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -64,6 +114,14 @@ export default function CartView({ locale, userId, onGoToCheckout, onSelectProdu
   };
 
   const handleDeleteSelected = () => {
+    if (!userId) {
+      let localCart = JSON.parse(localStorage.getItem('localCart') || '[]');
+      localCart = localCart.filter((i: any) => i.checked === false);
+      localStorage.setItem('localCart', JSON.stringify(localCart));
+      fetchCart();
+      return;
+    }
+    
     const selectedIds = items.filter(i => i.checked).map(i => i.id);
     if (selectedIds.length === 0) return;
     

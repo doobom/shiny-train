@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+const fs = require('fs');
+
+const code = `import React, { useState, useEffect } from 'react';
 import { User, Shield, Key, Edit, Trash2, Layers } from 'lucide-react';
 import { fetchWithAuth as apiFetch } from '../../utils/api';
 
@@ -189,19 +191,19 @@ export default function AdminUsers({ locale }: { locale: 'zh-HK' | 'en' }) {
       <div className="flex gap-2 mb-6">
         <button 
           onClick={() => setActiveTab('users')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'users' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          className={\`px-4 py-2 text-xs font-bold rounded-lg transition-colors \${activeTab === 'users' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}\`}
         >
           <User className="inline-block w-3.5 h-3.5 mr-1" /> {locale === 'zh-HK' ? '用戶管理' : 'Users'}
         </button>
         <button 
           onClick={() => setActiveTab('roles')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'roles' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          className={\`px-4 py-2 text-xs font-bold rounded-lg transition-colors \${activeTab === 'roles' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}\`}
         >
           <Shield className="inline-block w-3.5 h-3.5 mr-1" /> {locale === 'zh-HK' ? '角色設置' : 'Roles'}
         </button>
         <button 
           onClick={() => setActiveTab('tiers')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${activeTab === 'tiers' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          className={\`px-4 py-2 text-xs font-bold rounded-lg transition-colors \${activeTab === 'tiers' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}\`}
         >
           <Layers className="inline-block w-3.5 h-3.5 mr-1" /> {locale === 'zh-HK' ? '會員等級' : 'Member Tiers'}
         </button>
@@ -293,7 +295,7 @@ export default function AdminUsers({ locale }: { locale: 'zh-HK' | 'en' }) {
                     </td>
                       <td className="px-4 py-3">
                       <select
-                        className={`text-[10px] font-bold uppercase tracking-wider border rounded-lg p-1 ${user.tier === 'vip' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-gray-100 text-gray-600 border-gray-200'}`}
+                        className={\`text-[10px] font-bold uppercase tracking-wider border rounded-lg p-1 \${user.tier === 'vip' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-gray-100 text-gray-600 border-gray-200'}\`}
                         value={user.tier}
                         onChange={(e) => handleUpdateTier(user.id, e.target.value)}
                       >
@@ -391,7 +393,7 @@ export default function AdminUsers({ locale }: { locale: 'zh-HK' | 'en' }) {
                   <tr key={t.id}>
                     <td className="p-4 uppercase">{t.tier}</td>
                     <td className="p-4">{t.nameZh} / {t.nameEn}</td>
-                    <td className="p-4 text-amber-600 font-bold">HK${(t.minSpendCents / 100).toFixed(2)}</td>
+                    <td className="p-4 text-amber-600 font-bold">HK\${(t.minSpendCents / 100).toFixed(2)}</td>
                     <td className="p-4">{t.discountPercent}% OFF</td>
                     <td className="p-4 text-right">
                       <button onClick={() => handleDeleteTier(t.id)} className="text-red-500 hover:text-red-700 p-2"><Trash2 className="w-4 h-4" /></button>
@@ -407,3 +409,6 @@ export default function AdminUsers({ locale }: { locale: 'zh-HK' | 'en' }) {
     </div>
   );
 }
+`;
+
+fs.writeFileSync('src/components/admin/AdminUsers.tsx', code);
