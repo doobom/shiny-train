@@ -3,13 +3,6 @@ let code = fs.readFileSync('server.ts', 'utf8');
 
 const target = `app.post('/api/checkout/preview', authenticateToken, async (req, res) => {
   const { items } = req.body;
-  let subtotalCents = 0;
-  let itemDetails = [];
-  
-  const specs = items.length ? await db.query.productSpecs.findMany({`;
-
-const replace = `app.post('/api/checkout/preview', authenticateToken, async (req, res) => {
-  const { items } = req.body;
   
   // Enforce D20 limits
   let totalQty = items.reduce((sum:any, i:any) => sum + i.qty, 0);
@@ -25,6 +18,13 @@ const replace = `app.post('/api/checkout/preview', authenticateToken, async (req
     }
   }
 
+  let subtotalCents = 0;
+  let itemDetails = [];
+  
+  const specs = items.length ? await db.query.productSpecs.findMany({`;
+
+const replace = `app.post('/api/checkout/preview', authenticateToken, async (req, res) => {
+  const { items } = req.body;
   let subtotalCents = 0;
   let itemDetails = [];
   
