@@ -48,8 +48,26 @@ function decrypt(text) {
   return decrypted.toString();
 }
 
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+
 const app = express();
 const PORT = 3000;
+
+app.use(helmet({
+  contentSecurityPolicy: false, // disabled for vite dev server and standard spa
+  crossOriginEmbedderPolicy: false,
+}));
+
+// Apply rate limiting to all requests
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // limit each IP to 1000 requests per windowMs
+  message: 'Too many requests from this IP, please try again after 15 minutes'
+});
+app.use(limiter);
+
+
 
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
@@ -915,6 +933,33 @@ app.get('/api/admin/stats', authenticateAdmin, async (req, res) => {
   for (const inv of inventory) {
     if (inv.stock <= inv.warnThreshold) stockAlerts++;
   }
+
+  // Generate sales history for the last 7 days
+  const salesHistory = [];
+  const now = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split('T')[0];
+    
+    let dailySales = 0;
+    let dailyOrders = 0;
+    
+    for (const order of orders) {
+      if (!order.createdAt) continue;
+      const orderDateStr = new Date(order.createdAt).toISOString().split('T')[0];
+      if (orderDateStr === dateStr && (order.status === 'paid' || order.status === 'shipped' || order.status === 'completed')) {
+        dailySales += Number(order.grandTotalCents);
+        dailyOrders++;
+      }
+    }
+    
+    salesHistory.push({
+      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      sales: dailySales / 100,
+      orders: dailyOrders
+    });
+  }
   
   res.json({
     totalSalesCents,
@@ -923,7 +968,8 @@ app.get('/api/admin/stats', authenticateAdmin, async (req, res) => {
     stockAlerts,
     pendingOrders,
     paidOrders,
-    shippedOrders
+    shippedOrders,
+    salesHistory
   });
 });
 
@@ -1425,13 +1471,14 @@ app.post('/api/admin/init-db', async (req, res) => {
       );
       
       -- Shipping
+      DROP TABLE IF EXISTS "shipping_templates" CASCADE;
       CREATE TABLE IF NOT EXISTS "shipping_templates" (
         "id" text PRIMARY KEY NOT NULL,
-        "name" text NOT NULL,
-        "type" text NOT NULL,
-        "fee_cents" integer NOT NULL,
-        "free_threshold_cents" integer,
-        "enabled" boolean DEFAULT true
+        "name_zh" text,
+        "name_en" text,
+        "base_fee_cents" integer NOT NULL DEFAULT 3000,
+        "free_shipping_threshold_cents" integer DEFAULT 30000,
+        "active" boolean DEFAULT true
       );
 
       CREATE TABLE IF NOT EXISTS "shipping_logs" (
@@ -2202,10 +2249,10 @@ if (!isProduction) {
     });
   }).catch(console.error);
 } else {
-  const distPath = require('path').join(process.cwd(), 'dist');
+  const distPath = path.join(process.cwd(), 'dist');
   app.use(express.static(distPath));
   app.get('*', (req, res) => {
-    res.sendFile(require('path').join(distPath, 'index.html'));
+    res.sendFile(path.join(distPath, 'index.html'));
   });
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Prod] Server running on port ${PORT}`);
