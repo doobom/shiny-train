@@ -1431,7 +1431,8 @@ app.get('/api/orders/:id/receipt', authenticateToken, async (req, res) => {
 });
 
 
-if (process.env.NODE_ENV !== 'production') {
+const isProduction = process.env.NODE_ENV === 'production' || (!process.env.NODE_ENV && !!process.env.DATABASE_URL);
+if (!isProduction) {
   import('vite').then(async ({ createServer }) => {
     const vite = await createServer({
       server: { middlewareMode: true },
@@ -1445,7 +1446,7 @@ if (process.env.NODE_ENV !== 'production') {
     }).catch(console.error);
   });
 } else {
-  const distPath = require('path').join(process.cwd(), 'dist/client');
+  const distPath = require('path').join(process.cwd(), 'dist');
   app.use(express.static(distPath));
   app.get('*', (req, res) => {
     res.sendFile(require('path').join(distPath, 'index.html'));
