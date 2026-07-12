@@ -294,7 +294,21 @@ app.put('/api/auth/profile/email', authenticateToken, async (req, res) => {
 
 app.post('/api/auth/password/reset', async (req, res) => {
   const { token, newPassword } = req.body;
-  res.json({ success: true });
+  const resetToken = await db.query.emailResetTokens.findFirst({
+    where: and(eq(schema.emailResetTokens.token, token), gte(schema.emailResetTokens.expiresAt, new Date()))
+  });
+  if (!resetToken) return res.status(400).json({ code: 'INVALID_TOKEN', message: 'Token invalid or expired.' });
+  
+  const user = await db.query.users.findFirst({ where: eq(schema.users.id, resetToken.userId) });
+  if (!user) return res.status(404).json({ code: 'USER_NOT_FOUND', message: 'User not found.' });
+  
+  const pepper = process.env.PASSWORD_SALT || '';
+  const hashedPassword = await bcrypt.hash(newPassword + pepper, await bcrypt.genSalt(10));
+  
+  await db.update(schema.users).set({ passwordHash: hashedPassword }).where(eq(schema.users.id, user.id));
+  await db.delete(schema.emailResetTokens).where(eq(schema.emailResetTokens.id, resetToken.id));
+  
+  res.json({ success: true, message: 'Password reset successful.' });
 });
 
 // Shop Info
@@ -536,11 +550,11 @@ app.post('/api/checkout/preview', authenticateToken, async (req, res) => {
   const maxTotal = parseInt(settings.find((s: any) => s.key === 'max_total')?.value || '9999');
   
   if (totalQty > maxTotal) {
-     return res.status(400).json({ error: 'Exceeded maximum total items per order (' + maxTotal + ')' });
+     return res.status(400).json({ code: 'PURCHASE_LIMIT_EXCEEDED', message: 'Exceeded maximum total items per order (' + maxTotal + ')' });
   }
   for (const item of items) {
      if (item.qty > maxPerItem) {
-        return res.status(400).json({ error: 'Exceeded maximum quantity for a single item (' + maxPerItem + ')' });
+        return res.status(400).json({ code: 'PURCHASE_LIMIT_EXCEEDED', message: 'Exceeded maximum quantity for a single item (' + maxPerItem + ')' });
      }
   }
 
@@ -611,11 +625,11 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
   const maxTotal = parseInt(settings.find((s: any) => s.key === 'max_total')?.value || '9999');
   
   if (totalQty > maxTotal) {
-     return res.status(400).json({ error: 'Exceeded maximum total items per order (' + maxTotal + ')' });
+     return res.status(400).json({ code: 'PURCHASE_LIMIT_EXCEEDED', message: 'Exceeded maximum total items per order (' + maxTotal + ')' });
   }
   for (const item of items) {
      if (item.qty > maxPerItem) {
-        return res.status(400).json({ error: 'Exceeded maximum quantity for a single item (' + maxPerItem + ')' });
+        return res.status(400).json({ code: 'PURCHASE_LIMIT_EXCEEDED', message: 'Exceeded maximum quantity for a single item (' + maxPerItem + ')' });
      }
   }
 
@@ -1441,6 +1455,242 @@ app.post('/api/admin/products/batch-status', authenticateAdmin, async (req, res)
 
 const isProduction = process.env.NODE_ENV === 'production' || (!process.env.NODE_ENV && !!process.env.DATABASE_URL);
 
+
+// ================= NEW APIS =================
+
+// C端：合并本地购物车 (登录后触发)
+app.post('/api/cart/merge', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { localItems } = req.body; // [{ skuId: '...', qty: 2 }]
+  const cartId = `cart_${userId}`;
+  
+  await db.transaction(async (tx) => {
+    let cart = await tx.query.carts.findFirst({ where: eq(schema.carts.id, cartId) });
+    if (!cart) await tx.insert(schema.carts).values({ id: cartId, userId });
+
+    if (localItems && localItems.length > 0) {
+      for (const item of localItems) {
+        const existing = await tx.query.cartItems.findFirst({
+          where: and(eq(schema.cartItems.cartId, cartId), eq(schema.cartItems.skuId, item.skuId))
+        });
+        if (existing) {
+          await tx.update(schema.cartItems).set({ qty: existing.qty + item.qty }).where(eq(schema.cartItems.id, existing.id));
+        } else {
+          await tx.insert(schema.cartItems).values({
+            id: `ci_${uuidv4().substring(0,8)}`, cartId, skuId: item.skuId, qty: item.qty, checked: true
+          });
+        }
+      }
+    }
+  });
+  res.json({ success: true });
+});
+
+// C端：获取我的收藏列表
+app.get('/api/favorites', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const favs = await db.query.favorites.findMany({ where: eq(schema.favorites.userId, userId) });
+  const productIds = favs.map(f => f.productId);
+  const prods = productIds.length ? await db.query.products.findMany({ where: inArray(schema.products.id, productIds) }) : [];
+  res.json({ success: true, favorites: prods });
+});
+
+// C端：添加/取消收藏
+app.post('/api/favorites/:productId', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const productId = req.params.productId;
+  const existing = await db.query.favorites.findFirst({ 
+    where: and(eq(schema.favorites.userId, userId), eq(schema.favorites.productId, productId)) 
+  });
+  if (!existing) {
+    await db.insert(schema.favorites).values({ id: `fav_${uuidv4().substring(0,8)}`, userId, productId });
+  }
+  res.json({ success: true });
+});
+app.delete('/api/favorites/:productId', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  await db.delete(schema.favorites).where(and(eq(schema.favorites.userId, userId), eq(schema.favorites.productId, req.params.productId)));
+  res.json({ success: true });
+});
+
+// B端：分类管理 CRUD
+app.post('/api/admin/categories', authenticateAdmin, requirePermission('products'), async (req, res) => {
+  const newId = `cat_${uuidv4().substring(0,8)}`;
+  await db.insert(schema.categories).values({ id: newId, ...req.body });
+  res.json({ success: true, id: newId });
+});
+app.patch('/api/admin/categories/:id', authenticateAdmin, requirePermission('products'), async (req, res) => {
+  await db.update(schema.categories).set(req.body).where(eq(schema.categories.id, req.params.id));
+  res.json({ success: true });
+});
+app.delete('/api/admin/categories/:id', authenticateAdmin, requirePermission('products'), async (req, res) => {
+  await db.delete(schema.categories).where(eq(schema.categories.id, req.params.id));
+  res.json({ success: true });
+});
+
+// B端：库存预警列表 (低于 warnThreshold)
+app.get('/api/admin/inventory/warnings', authenticateAdmin, requirePermission('products'), async (req, res) => {
+  const warnings = await db.query.inventory.findMany({
+    where: sql`stock <= warn_threshold`
+  });
+  res.json({ success: true, warnings });
+});
+
+
+// ================= NEW CONTENT CRUD APIS =================
+// Banners CRUD
+app.post('/api/admin/banners', authenticateAdmin, requirePermission('content'), async (req, res) => {
+  const newId = `ban_${uuidv4().substring(0,8)}`;
+  await db.insert(schema.banners).values({ id: newId, ...req.body });
+  res.json({ success: true, id: newId });
+});
+app.patch('/api/admin/banners/:id', authenticateAdmin, requirePermission('content'), async (req, res) => {
+  await db.update(schema.banners).set(req.body).where(eq(schema.banners.id, req.params.id));
+  res.json({ success: true });
+});
+app.delete('/api/admin/banners/:id', authenticateAdmin, requirePermission('content'), async (req, res) => {
+  await db.delete(schema.banners).where(eq(schema.banners.id, req.params.id));
+  res.json({ success: true });
+});
+
+// Announcements CRUD
+app.post('/api/admin/announcements', authenticateAdmin, requirePermission('content'), async (req, res) => {
+  const newId = `ann_${uuidv4().substring(0,8)}`;
+  await db.insert(schema.announcements).values({ id: newId, ...req.body });
+  res.json({ success: true, id: newId });
+});
+app.patch('/api/admin/announcements/:id', authenticateAdmin, requirePermission('content'), async (req, res) => {
+  await db.update(schema.announcements).set(req.body).where(eq(schema.announcements.id, req.params.id));
+  res.json({ success: true });
+});
+app.delete('/api/admin/announcements/:id', authenticateAdmin, requirePermission('content'), async (req, res) => {
+  await db.delete(schema.announcements).where(eq(schema.announcements.id, req.params.id));
+  res.json({ success: true });
+});
+
+// FAQs CRUD
+app.post('/api/admin/faqs', authenticateAdmin, requirePermission('content'), async (req, res) => {
+  const newId = `faq_${uuidv4().substring(0,8)}`;
+  await db.insert(schema.faqs).values({ id: newId, ...req.body });
+  res.json({ success: true, id: newId });
+});
+app.patch('/api/admin/faqs/:id', authenticateAdmin, requirePermission('content'), async (req, res) => {
+  await db.update(schema.faqs).set(req.body).where(eq(schema.faqs.id, req.params.id));
+  res.json({ success: true });
+});
+app.delete('/api/admin/faqs/:id', authenticateAdmin, requirePermission('content'), async (req, res) => {
+  await db.delete(schema.faqs).where(eq(schema.faqs.id, req.params.id));
+  res.json({ success: true });
+});
+
+
+// ================= NEW BATCH / EXPORT APIS =================
+
+// B端：商品批量操作 - 批量导出 (CSV)
+app.get('/api/admin/products/export', authenticateAdmin, requirePermission('products'), async (req, res) => {
+  const prods = await db.query.products.findMany();
+  let csv = 'ID,NameZh,NameEn,CategoryId,PriceOriginal,PriceAfter,Status\n';
+  for (const p of prods) {
+    csv += `"${p.id}","${p.nameZh}","${p.nameEn}","${p.categoryId}","${p.priceOriginalCents}","${p.priceAfterCents}","${p.status}"\n`;
+  }
+  res.header('Content-Type', 'text/csv');
+  res.attachment('products.csv');
+  return res.send(csv);
+});
+
+// B端：订单数据导出 (CSV)
+app.get('/api/admin/orders/export', authenticateAdmin, requirePermission('orders'), async (req, res) => {
+  const { status, startDate, endDate } = req.query;
+  const conditions = [];
+  if (status) conditions.push(eq(schema.orders.status, status));
+  if (startDate) conditions.push(gte(schema.orders.createdAt, new Date(startDate)));
+  if (endDate) conditions.push(sql`created_at <= ${new Date(endDate)}`);
+  
+  const orderList = await db.query.orders.findMany({
+    where: conditions.length > 0 ? and(...conditions) : undefined,
+    with: { items: true }
+  });
+  
+  let csv = 'OrderID,Status,UserId,TotalCents,CreatedAt,ItemsCount\n';
+  for (const o of orderList) {
+    csv += `"${o.id}","${o.status}","${o.userId}","${o.grandTotalCents}","${o.createdAt}","${o.items.length}"\n`;
+  }
+  res.header('Content-Type', 'text/csv');
+  res.attachment('orders.csv');
+  return res.send(csv);
+});
+
+// 电子收据 (SDRS §6.10)
+app.get('/api/orders/:id/receipt', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const order = await db.query.orders.findFirst({
+    where: and(eq(schema.orders.id, req.params.id), eq(schema.orders.userId, userId)),
+    with: { items: { with: { sku: { with: { product: true } } } } }
+  });
+  if (!order) return res.status(404).json({ code: 'NOT_FOUND', message: 'Order not found.' });
+  if (order.status === 'pending_payment') return res.status(400).json({ code: 'NOT_PAID', message: 'Order not paid.' });
+  
+  let html = `
+    <html>
+      <body style="font-family: sans-serif; padding: 20px;">
+        <h2>Electronic Receipt</h2>
+        <p><strong>Order ID:</strong> ${order.id}</p>
+        <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString()}</p>
+        <hr />
+        <ul>
+  `;
+  for (const item of order.items) {
+    html += `<li>${item.sku?.product?.nameEn || 'Item'} x${item.qty} - HK$ ${((item.priceCents * item.qty) / 100).toFixed(2)}</li>`;
+  }
+  html += `
+        </ul>
+        <hr />
+        <p><strong>Subtotal:</strong> HK$ ${(order.totalCents / 100).toFixed(2)}</p>
+        <p><strong>Shipping:</strong> HK$ ${(order.shippingFeeCents / 100).toFixed(2)}</p>
+        <p><strong>Discount:</strong> -HK$ ${(order.discountCents / 100).toFixed(2)}</p>
+        <h3><strong>Total:</strong> HK$ ${(order.grandTotalCents / 100).toFixed(2)}</h3>
+        <button onclick="window.print()" style="margin-top:20px;">Print</button>
+      </body>
+    </html>
+  `;
+  res.send(html);
+});
+
+
+// ================= NEW ROLES CRUD APIS =================
+// B端：角色与权限管理
+app.get('/api/admin/roles', authenticateAdmin, async (req, res) => {
+  const allRoles = await db.query.roles.findMany();
+  res.json({ success: true, roles: allRoles });
+});
+app.post('/api/admin/roles', authenticateAdmin, async (req, res) => {
+  const newId = `role_${uuidv4().substring(0,8)}`;
+  await db.insert(schema.roles).values({ id: newId, ...req.body });
+  res.json({ success: true, id: newId });
+});
+app.patch('/api/admin/roles/:id', authenticateAdmin, async (req, res) => {
+  await db.update(schema.roles).set(req.body).where(eq(schema.roles.id, req.params.id));
+  res.json({ success: true });
+});
+app.delete('/api/admin/roles/:id', authenticateAdmin, async (req, res) => {
+  await db.delete(schema.roles).where(eq(schema.roles.id, req.params.id));
+  res.json({ success: true });
+});
+
+app.get('/api/admin/roles/:id/permissions', authenticateAdmin, async (req, res) => {
+  const perms = await db.query.rolePermissions.findMany({ where: eq(schema.rolePermissions.roleId, req.params.id) });
+  res.json({ success: true, permissions: perms });
+});
+app.post('/api/admin/roles/:id/permissions', authenticateAdmin, async (req, res) => {
+  const { module } = req.body;
+  const newId = `rp_${uuidv4().substring(0,8)}`;
+  await db.insert(schema.rolePermissions).values({ id: newId, roleId: req.params.id, module });
+  res.json({ success: true, id: newId });
+});
+app.delete('/api/admin/roles/:id/permissions/:permId', authenticateAdmin, async (req, res) => {
+  await db.delete(schema.rolePermissions).where(eq(schema.rolePermissions.id, req.params.permId));
+  res.json({ success: true });
+});
 // Apply migrations
 migrate().then(() => {
   console.log("Database migrated successfully.");

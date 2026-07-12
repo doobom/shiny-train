@@ -1,3 +1,5 @@
+import { eq } from 'drizzle-orm';
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { db } from './db.js';
 import * as schema from './schema.js';
@@ -18,12 +20,17 @@ export async function seedDatabase() {
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
   
   const existingAdmin = await db.query.users.findFirst({ where: (u, { eq }) => eq(u.email, adminEmail) });
+    const pwHash = await bcrypt.hash(crypto.createHash('sha256').update(adminPassword).digest('hex') + (process.env.PASSWORD_SALT || ''), await bcrypt.genSalt(10));
+    if (existingAdmin) {
+      await db.update(schema.users).set({ passwordHash: pwHash }).where(eq(schema.users.email, adminEmail));
+      console.log(`Admin user password updated: ${adminEmail}`);
+    }
   
   if (!existingAdmin) {
     await db.insert(schema.users).values({
       id: `usr_${uuidv4().substring(0, 8)}`,
       email: adminEmail,
-      passwordHash: await bcrypt.hash(adminPassword + (process.env.PASSWORD_SALT || ''), await bcrypt.genSalt(10)),
+      passwordHash: await bcrypt.hash(crypto.createHash('sha256').update(adminPassword).digest('hex') + (process.env.PASSWORD_SALT || ''), await bcrypt.genSalt(10)),
       locale: 'zh-HK',
       status: 'active',
       role: 'admin',
