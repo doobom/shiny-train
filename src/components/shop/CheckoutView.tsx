@@ -1,7 +1,7 @@
 import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Truck, ChevronRight, MessageSquare, AlertCircle } from 'lucide-react';
-import { Locale } from '../../types/index.ts';
+import { CreditCard, Truck, ChevronRight, MessageSquare, AlertCircle, Tag } from 'lucide-react';
+import { Locale } from '../../types/index';
 
 interface CheckoutViewProps {
   locale: Locale;
@@ -19,6 +19,7 @@ export default function CheckoutView({ locale, userId, onOrderPlaced }: Checkout
   
   const [selectedPayment, setSelectedPayment] = useState<'fps' | 'payme' | 'alipayhk' | 'bank_transfer'>('fps');
   const [remark, setRemark] = useState('');
+  const [promoCode, setPromoCode] = useState('');
   const [preview, setPreview] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -37,10 +38,16 @@ export default function CheckoutView({ locale, userId, onOrderPlaced }: Checkout
           apiFetch('/api/checkout/preview', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items: payload })
+            body: JSON.stringify({ items: payload, promoCode: promoCode ? promoCode : undefined })
           })
           .then(res => res.json())
-          .then(previewData => setPreview(previewData))
+          .then(previewData => {
+            if (previewData.code || previewData.error) {
+              setErr(previewData.message || previewData.error);
+            } else {
+              setPreview(previewData);
+            }
+          })
           .catch(e => console.error(e));
         }
       });
@@ -54,6 +61,7 @@ export default function CheckoutView({ locale, userId, onOrderPlaced }: Checkout
     const payload = {
       userId,
       items: cartItems.map((c: any) => ({ skuId: c.skuId, qty: c.qty })),
+      promoCode: promoCode ? promoCode : undefined,
       address: {
         recipient: address.recipient,
         phoneEncrypted: address.phone, // simplicity in preview
@@ -118,6 +126,16 @@ export default function CheckoutView({ locale, userId, onOrderPlaced }: Checkout
       purchaseLimitTip: 'Note: Storewide limits allow max 5 items per transaction.',
     }
   }[locale];
+
+  if (err) {
+    return (
+      <div className="flex flex-col justify-center items-center h-64 space-y-4">
+        <AlertCircle className="w-12 h-12 text-red-500" />
+        <p className="text-gray-900 font-medium">{err}</p>
+        <button onClick={() => window.location.reload()} className="px-4 py-2 bg-neutral-900 text-white rounded">Retry</button>
+      </div>
+    );
+  }
 
   if (!preview) {
     return (

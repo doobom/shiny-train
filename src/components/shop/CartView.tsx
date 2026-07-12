@@ -1,7 +1,7 @@
 import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Trash2, CheckSquare, Square, ChevronRight } from 'lucide-react';
-import { Locale } from '../../types/index.ts';
+import { Locale } from '../../types/index';
 
 interface CartViewProps {
   locale: Locale;

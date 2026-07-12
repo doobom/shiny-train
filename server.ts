@@ -556,7 +556,8 @@ app.post('/api/cart/batch', authenticateToken, async (req, res) => {
 
 // Checkout
 app.post('/api/checkout/preview', authenticateToken, async (req, res) => {
-  const { items } = req.body;
+  const items = req.body.items || [];
+  const promoCode = req.body.promoCode;
   let subtotalCents = 0;
   let itemDetails = [];
   
@@ -622,7 +623,24 @@ app.post('/api/checkout/preview', authenticateToken, async (req, res) => {
     }
   }
   discountCents += bestExclusive;
+
+  let promoDiscount = 0;
+  if (promoCode) {
+    const p = await db.query.discounts.findFirst({ where: eq(schema.discounts.code, promoCode) });
+    if (p && p.active && (!p.validUntil || new Date(p.validUntil) > new Date()) && (!p.minOrderValueCents || subtotalCents >= p.minOrderValueCents)) {
+      if (p.type === 'percentage') {
+        promoDiscount = Math.floor(subtotalCents * (p.value / 100));
+      } else {
+        promoDiscount = p.value;
+      }
+    } else if (p) {
+       return res.status(400).json({ error: 'Promo code invalid or minimum order value not reached.' });
+    } else {
+       return res.status(404).json({ error: 'Promo code not found.' });
+    }
+  }
   
+  discountCents += promoDiscount;
   if (discountCents > subtotalCents) discountCents = subtotalCents;
 
   let shippingFeeCents = (subtotalCents - discountCents) >= 30000 ? 0 : 3000; // Free shipping over HK$300, else HK$30
@@ -639,7 +657,8 @@ app.post('/api/checkout/preview', authenticateToken, async (req, res) => {
 
 app.post('/api/orders', authenticateToken, async (req, res) => {
   const user = await db.query.users.findFirst({ where: eq(schema.users.id, (req as any).user.id) });
-  const { items, address, paymentMethod, remark } = req.body;
+  const { address, paymentMethod, remark, promoCode } = req.body;
+  const items = req.body.items || [];
   const userId = (req as any).user.id;
   
   const specs = items.length ? await db.query.productSpecs.findMany({
@@ -936,10 +955,12 @@ app.post('/api/admin/products', authenticateAdmin, requirePermission('products')
     id,
     nameZh: data.nameZh,
     nameEn: data.nameEn,
+    descriptionZh: data.descriptionZh,
+    descriptionEn: data.descriptionEn,
     priceOriginalCents: data.priceOriginalCents,
     priceAfterCents: data.priceAfterCents,
     categoryId: data.categoryId,
-    images: data.imageUrl ? [data.imageUrl] : []
+    images: data.images || (data.imageUrl ? [data.imageUrl] : [])
   });
   res.json({ success: true, id });
 });
@@ -979,6 +1000,17 @@ app.get('/api/admin/orders', authenticateAdmin, requirePermission('orders'), asy
 
 app.post('/api/admin/orders/:id/ship', authenticateAdmin, requirePermission('orders'), async (req, res) => {
   await db.update(schema.orders).set({ status: 'shipped', remark: req.body.trackingNo }).where(eq(schema.orders.id, req.params.id));
+  const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, req.params.id) });
+  if (order) {
+    const user = await db.query.users.findFirst({ where: eq(schema.users.id, order.userId) });
+    if (user && user.email) {
+      emailQueue.push({
+        to: user.email,
+        subject: `【香港生活百貨】您的訂單已發貨 (訂單號: ${order.id})`,
+        content: `<p>您好，您的訂單 <b>${order.id}</b> 已經發貨。</p><p>追蹤號碼: ${req.body.trackingNo || '無'}</p><p>感謝您的惠顧！</p>`
+      });
+    }
+  }
   res.json({ success: true });
 });
 
@@ -1040,6 +1072,14 @@ app.post('/api/admin/orders/:id/approve-payment', authenticateAdmin, requirePerm
     if (!order) throw new Error('Order not found');
     await tx.update(schema.orders).set({ status: 'paid' }).where(eq(schema.orders.id, req.params.id));
     await tx.update(schema.payments).set({ status: 'success' }).where(eq(schema.payments.orderId, req.params.id));
+    const user = await tx.query.users.findFirst({ where: eq(schema.users.id, order.userId) });
+    if (user && user.email) {
+      emailQueue.push({
+        to: user.email,
+        subject: `【香港生活百貨】付款成功 (訂單號: ${order.id})`,
+        content: `<p>您好，您的訂單 <b>${order.id}</b> 已經成功確認付款。</p><p>我們將盡快為您安排發貨！</p>`
+      });
+    }
   });
   res.json({ success: true });
 });
@@ -1320,6 +1360,18 @@ app.post('/api/admin/init-db', async (req, res) => {
         "used" boolean DEFAULT false
       );
 
+      CREATE TABLE IF NOT EXISTS "promo_codes" (
+        "id" text PRIMARY KEY NOT NULL,
+        "code" text NOT NULL UNIQUE,
+        "type" text NOT NULL,
+        "value" integer NOT NULL,
+        "max_usage" integer,
+        "current_usage" integer DEFAULT 0,
+        "expires_at" timestamp,
+        "active" boolean DEFAULT true,
+        "created_at" timestamp DEFAULT now()
+      );
+      
       CREATE TABLE IF NOT EXISTS "favorites" (
         "id" text PRIMARY KEY NOT NULL,
         "user_id" text REFERENCES "users"("id"),

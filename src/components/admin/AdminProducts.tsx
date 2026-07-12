@@ -1,5 +1,7 @@
 import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { ShoppingBag, PlusCircle, AlertTriangle, Edit, RefreshCw, BadgeCheck, Trash2, Tag, Layers, CheckSquare } from 'lucide-react';
 import { Locale, Category } from '../../types/index.ts';
 
@@ -19,6 +21,8 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [nameZh, setNameZh] = useState('');
   const [nameEn, setNameEn] = useState('');
+  const [descriptionZh, setDescriptionZh] = useState('');
+  const [descriptionEn, setDescriptionEn] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -89,7 +93,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
     e.preventDefault();
     if (!nameZh || !nameEn) return;
     const payload = {
-      nameZh, nameEn, priceOriginalCents: originalCents, priceAfterCents: afterCents,
+      nameZh, nameEn, descriptionZh, descriptionEn, priceOriginalCents: originalCents, priceAfterCents: afterCents,
       categoryId, imageUrls: imageUrl ? [imageUrl] : [],
       specs: [{ specNameZh, specNameEn, stock: initialStock, warnThreshold }]
     };
@@ -310,6 +314,18 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
                   </div>
                 </div>
               </div>
+              
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase block">Description (ZH)</label>
+                  <ReactQuill theme="snow" value={descriptionZh} onChange={setDescriptionZh} className="bg-white" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-500 uppercase block">Description (EN)</label>
+                  <ReactQuill theme="snow" value={descriptionEn} onChange={setDescriptionEn} className="bg-white" />
+                </div>
+              </div>
+
               <div className="border-t border-gray-200 pt-4 flex justify-end gap-2">
                 <button type="button" onClick={() => setShowAddForm(false)} className="px-4 py-2 text-xs font-bold border rounded-lg text-gray-600">Cancel</button>
                 <button type="submit" className="px-4 py-2 text-xs font-bold bg-gray-900 text-white rounded-lg">Publish</button>

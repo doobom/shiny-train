@@ -1,39 +1,78 @@
 const fs = require('fs');
 let code = fs.readFileSync('server.ts', 'utf8');
 
-const newApis = `
-app.post('/api/admin/products/batch-discount', authenticateAdmin, async (req, res) => {
-  const { productIds, discountPercent } = req.body;
-  if (!productIds || !productIds.length || typeof discountPercent !== 'number') return res.json({ success: true });
-  
-  const productList = await db.query.products.findMany({ where: inArray(schema.products.id, productIds) });
-  await db.transaction(async (tx) => {
-    for (const p of productList) {
-      const newPrice = Math.floor(p.priceOriginalCents * ((100 - discountPercent) / 100));
-      await tx.update(schema.products).set({ priceAfterCents: newPrice }).where(eq(schema.products.id, p.id));
+const oldPreviewLookup = `  let promoDiscount = 0;
+  if (promoCode) {
+    const p = await db.query.promoCodes.findFirst({ where: eq(schema.promoCodes.code, promoCode) });
+    if (p && p.active && (!p.maxUsage || (p.currentUsage || 0) < p.maxUsage) && (!p.expiresAt || new Date(p.expiresAt) > new Date())) {
+      if (p.type === 'percent') {
+        promoDiscount = Math.floor(subtotalCents * (p.value / 100));
+      } else {
+        promoDiscount = p.value;
+      }
+    } else if (p) {
+       return res.status(400).json({ error: 'Promo code is invalid, expired, or fully used.' });
+    } else {
+       return res.status(404).json({ error: 'Promo code not found.' });
     }
-  });
-  res.json({ success: true });
-});
+  }`;
 
-app.post('/api/admin/discounts', authenticateAdmin, async (req, res) => {
-  const id = \`dsc_\${require('uuid').v4().substring(0,8)}\`;
-  await db.insert(schema.discounts).values({ id, ...req.body });
-  res.json({ success: true, id });
-});
-app.patch('/api/admin/discounts/:id', authenticateAdmin, async (req, res) => {
-  await db.update(schema.discounts).set(req.body).where(eq(schema.discounts.id, req.params.id));
-  res.json({ success: true });
-});
-app.delete('/api/admin/discounts/:id', authenticateAdmin, async (req, res) => {
-  await db.delete(schema.discounts).where(eq(schema.discounts.id, req.params.id));
-  res.json({ success: true });
-});
+const newPreviewLookup = `  let promoDiscount = 0;
+  if (promoCode) {
+    const p = await db.query.discounts.findFirst({ where: eq(schema.discounts.code, promoCode) });
+    if (p && p.active && (!p.validUntil || new Date(p.validUntil) > new Date()) && (!p.minOrderValueCents || subtotalCents >= p.minOrderValueCents)) {
+      if (p.type === 'percentage') {
+        promoDiscount = Math.floor(subtotalCents * (p.value / 100));
+      } else {
+        promoDiscount = p.value;
+      }
+    } else if (p) {
+       return res.status(400).json({ error: 'Promo code invalid or minimum order value not reached.' });
+    } else {
+       return res.status(404).json({ error: 'Promo code not found.' });
+    }
+  }`;
 
-// ================= NEW APIS =================`;
+code = code.replace(oldPreviewLookup, newPreviewLookup);
 
-if (!code.includes("batch-discount")) {
-  code = code.replace("// ================= NEW APIS =================", newApis);
-  fs.writeFileSync('server.ts', code);
-}
+const oldOrderLookup = `  let promoRecord = null;
+  if (promoCode) {
+    const p = await db.query.promoCodes.findFirst({ where: eq(schema.promoCodes.code, promoCode) });
+    if (p && p.active && (!p.maxUsage || (p.currentUsage || 0) < p.maxUsage) && (!p.expiresAt || new Date(p.expiresAt) > new Date())) {
+      promoRecord = p;
+      if (p.type === 'percent') {
+        discountCents += Math.floor(totalCents * (p.value / 100));
+      } else {
+        discountCents += p.value;
+      }
+    } else {
+       return res.status(400).json({ error: 'Promo code invalid or expired.' });
+    }
+  }`;
 
+const newOrderLookup = `  let promoRecord = null;
+  if (promoCode) {
+    const p = await db.query.discounts.findFirst({ where: eq(schema.discounts.code, promoCode) });
+    if (p && p.active && (!p.validUntil || new Date(p.validUntil) > new Date()) && (!p.minOrderValueCents || totalCents >= p.minOrderValueCents)) {
+      promoRecord = p;
+      if (p.type === 'percentage') {
+        discountCents += Math.floor(totalCents * (p.value / 100));
+      } else {
+        discountCents += p.value;
+      }
+    } else {
+       return res.status(400).json({ error: 'Promo code invalid or expired.' });
+    }
+  }`;
+
+code = code.replace(oldOrderLookup, newOrderLookup);
+
+const oldOrderSave = `    if (promoRecord) {
+      await tx.update(schema.promoCodes).set({ currentUsage: (promoRecord.currentUsage || 0) + 1 }).where(eq(schema.promoCodes.id, promoRecord.id));
+    }`;
+
+const newOrderSave = ``; // We don't have currentUsage in discounts table
+
+code = code.replace(oldOrderSave, newOrderSave);
+
+fs.writeFileSync('server.ts', code);

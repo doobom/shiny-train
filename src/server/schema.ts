@@ -1,6 +1,18 @@
 import { pgTable, serial, varchar, text, integer, boolean, timestamp, jsonb, doublePrecision } from 'drizzle-orm/pg-core';
 
 
+export const promoCodes = pgTable('promo_codes', {
+  id: text('id').primaryKey(),
+  code: text('code').notNull().unique(),
+  type: text('type').notNull(), // 'fixed' or 'percent'
+  value: integer('value').notNull(), // cents if fixed, percentage (e.g., 10 for 10%) if percent
+  maxUsage: integer('max_usage'),
+  currentUsage: integer('current_usage').default(0),
+  expiresAt: timestamp('expires_at'),
+  active: boolean('active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
   email: text('email').notNull().unique(),
