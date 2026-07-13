@@ -121,6 +121,22 @@ export default function AdminUsers({ locale }: { locale: 'zh-HK' | 'en' }) {
     }
   };
 
+  const handleUpdateStatus = async (userId: string, newStatus: string) => {
+    try {
+      const res = await apiFetch('/api/admin/users/' + userId + '/status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = await res.json();
+      if (data.success) {
+        fetchUsers();
+      }
+    } catch(e) {
+      console.error(e);
+    }
+  };
+
   const handleUpdateTier = async (userId: string, newTier: string) => {
     try {
       const res = await apiFetch('/api/admin/users/' + userId + '/tier', {
@@ -324,8 +340,11 @@ export default function AdminUsers({ locale }: { locale: 'zh-HK' | 'en' }) {
                       </select>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button className="text-neutral-400 hover:text-neutral-900 transition-colors p-1">
-                        <Edit className="h-4 w-4" />
+                      <button 
+                        onClick={() => handleUpdateStatus(user.id, user.status === 'active' ? 'banned' : 'active')}
+                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded transition-colors ${user.status === 'active' ? 'text-red-600 bg-red-50 hover:bg-red-100' : 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'}`}
+                      >
+                        {user.status === 'active' ? 'Ban' : 'Unban'}
                       </button>
                     </td>
                   </tr>

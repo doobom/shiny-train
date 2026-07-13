@@ -188,13 +188,13 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
           onClick={() => setActiveTab('reductions')} 
           className={`pb-2 px-1 text-sm font-bold ${activeTab === 'reductions' ? 'text-neutral-900 border-b-2 border-neutral-900' : 'text-gray-400 hover:text-gray-600'}`}
         >
-          {locale === 'zh-HK' ? '{dict.reductionsTab}' : 'Full Reductions'}
+          {dict.reductionsTab}
         </button>
         <button 
           onClick={() => setActiveTab('coupons')} 
           className={`pb-2 px-1 text-sm font-bold ${activeTab === 'coupons' ? 'text-neutral-900 border-b-2 border-neutral-900' : 'text-gray-400 hover:text-gray-600'}`}
         >
-          {locale === 'zh-HK' ? '{dict.couponsTab}' : 'Coupon Codes'}
+          {dict.couponsTab}
         </button>
       </div>
 
@@ -262,8 +262,8 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
                   <label htmlFor="stackable_chk" className="text-xs font-semibold text-gray-700 cursor-pointer">Allow stacking</label>
                 </div>
                 <div className="md:col-span-2 pt-2 flex gap-3">
-                  <button type="submit" className="bg-neutral-950 hover:bg-neutral-800 text-white font-bold px-6 py-2.5 rounded-xl">{locale === "zh-HK" ? "保存" : "Save"}</button>
-                  <button type="button" onClick={() => setShowAddReduction(false)} className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2.5 rounded-xl">{locale === "zh-HK" ? "取消" : "Cancel"}</button>
+                  <button type="submit" className="bg-neutral-950 hover:bg-neutral-800 text-white font-bold px-6 py-2.5 rounded-xl">{dict.save}</button>
+                  <button type="button" onClick={() => setShowAddReduction(false)} className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2.5 rounded-xl">{dict.cancel}</button>
                 </div>
               </form>
             </div>
@@ -313,36 +313,36 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
               onClick={() => setShowAddCoupon(!showAddCoupon)}
               className="bg-neutral-900 hover:bg-neutral-800 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-colors shadow-sm"
             >
-              <PlusCircle className="h-4 w-4" /> Add Coupon Code
+              <PlusCircle className="h-4 w-4" /> {dict.addCoupon}
             </button>
           </div>
 
           {showAddCoupon && (
             <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm animate-fade-in">
-              <h2 className="text-sm font-bold text-gray-950 font-display mb-4 border-b pb-2">New Coupon Code</h2>
+              <h2 className="text-sm font-bold text-gray-950 font-display mb-4 border-b pb-2">{dict.addCoupon}</h2>
               <form onSubmit={handleAddCoupon} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-gray-600">
                 <div className="space-y-1.5">
-                  <label>Coupon Code (e.g. SUMMER10)</label>
+                  <label>{dict.couponCode} (e.g. SUMMER10)</label>
                   <input type="text" required value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} className="w-full border p-2.5 rounded-lg text-gray-950 font-medium uppercase" />
                 </div>
                 <div className="space-y-1.5">
-                  <label>Discount Type</label>
+                  <label>{dict.type}</label>
                   <select value={couponType} onChange={e => setCouponType(e.target.value as any)} className="w-full border p-2.5 rounded-lg text-gray-950 bg-white font-medium">
-                    <option value="fixed">Fixed Amount (Cents)</option>
-                    <option value="percentage">Percentage (%)</option>
+                    <option value="fixed">{dict.fixedAmount} (Cents)</option>
+                    <option value="percentage">{dict.percentage} (%)</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label>Discount Value</label>
+                  <label>{dict.value}</label>
                   <input type="number" required value={couponValue} onChange={e => setCouponValue(Number(e.target.value))} className="w-full border p-2.5 rounded-lg text-gray-950 font-mono" />
                 </div>
                 <div className="space-y-1.5">
-                  <label>Min Order Value (Cents)</label>
+                  <label>{dict.minOrder} (Cents)</label>
                   <input type="number" value={couponMinOrder} onChange={e => setCouponMinOrder(Number(e.target.value))} className="w-full border p-2.5 rounded-lg text-gray-950 font-mono" />
                 </div>
                 <div className="md:col-span-2 pt-2 flex gap-3">
-                  <button type="submit" className="bg-neutral-950 hover:bg-neutral-800 text-white font-bold px-6 py-2.5 rounded-xl">{locale === "zh-HK" ? "保存" : "Save"}</button>
-                  <button type="button" onClick={() => setShowAddCoupon(false)} className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2.5 rounded-xl">{locale === "zh-HK" ? "取消" : "Cancel"}</button>
+                  <button type="submit" className="bg-neutral-950 hover:bg-neutral-800 text-white font-bold px-6 py-2.5 rounded-xl">{dict.save}</button>
+                  <button type="button" onClick={() => setShowAddCoupon(false)} className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2.5 rounded-xl">{dict.cancel}</button>
                 </div>
               </form>
             </div>

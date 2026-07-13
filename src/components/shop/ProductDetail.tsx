@@ -172,14 +172,23 @@ export default function ProductDetail({
 
   return (
     <div className="space-y-6">
-      {/* Back button */}
-      <button 
-        onClick={onBack}
-        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-neutral-950 font-medium transition-colors"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        {dict.back}
-      </button>
+      {/* Header controls */}
+      <div className="flex justify-between items-center">
+        <button 
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-neutral-950 font-medium transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          {dict.back}
+        </button>
+        <button
+          onClick={handleShare}
+          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-neutral-950 font-medium transition-colors bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg"
+        >
+          <Share2 className="h-4 w-4" />
+          {locale === 'zh-HK' ? '分享' : 'Share'}
+        </button>
+      </div>
 
       {/* Notifications and Error boundaries */}
       {notification && (

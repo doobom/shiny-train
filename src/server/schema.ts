@@ -18,6 +18,7 @@ export const users = pgTable('users', {
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   phoneEncrypted: text('phone_encrypted'),
+  avatarUrl: text('avatar_url'),
   locale: text('locale').default('zh-HK'),
   status: text('status').default('active'),
   role: text('role').default('customer'),

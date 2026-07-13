@@ -23,6 +23,30 @@ export default function UserProfile({ userId, locale, onPayNow }: UserProfilePro
   const [addressForm, setAddressForm] = useState({ recipient: '', phone: '', detail: '', remark: '', isDefault: false });
   const [showAddressForm, setShowAddressForm] = useState(false);
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const formData = new FormData();
+    formData.append('avatar', e.target.files[0]);
+
+    try {
+      const res = await apiFetch('/api/user/avatar', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        const updatedUser = { ...user, avatarUrl: data.avatarUrl };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        window.location.reload();
+      } else {
+        alert(data.message || 'Avatar upload failed');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Upload error');
+    }
+  };
+
   const fetchAddresses = () => {
     apiFetch('/api/user/addresses', { headers: { Authorization: `Bearer ${token}` } })
       .then(res => res.json())
@@ -301,8 +325,24 @@ export default function UserProfile({ userId, locale, onPayNow }: UserProfilePro
         <div className="bg-white p-5 rounded-xl border border-gray-150 space-y-6">
           <div>
             <h3 className="text-sm font-bold text-gray-950 font-display mb-1">{locale === 'zh-HK' ? '帳戶資料' : 'Account Details'}</h3>
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+            <div className="flex items-center gap-4 mt-4">
+              <div className="relative group">
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
+                  {user?.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-xl">
+                      {user?.email?.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <label className="absolute inset-0 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                  <span className="text-[10px] font-bold">Edit</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+                </label>
+              </div>
+              <div className="flex-1 grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                 <span className="text-[10px] text-gray-400 uppercase font-semibold block">{locale === 'zh-HK' ? '電郵地址' : 'Email'}</span>
                 <span className="text-xs font-bold text-gray-900">{user?.email}</span>
               </div>
@@ -313,6 +353,7 @@ export default function UserProfile({ userId, locale, onPayNow }: UserProfilePro
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                 <span className="text-[10px] text-gray-400 uppercase font-semibold block">{locale === 'zh-HK' ? '權限' : 'Role'}</span>
                 <span className="text-xs font-bold text-emerald-600 uppercase">{(user as any)?.role || 'CUSTOMER'}</span>
+              </div>
               </div>
             </div>
             

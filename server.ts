@@ -52,6 +52,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
 const app = express();
+const upload = multer({ storage: multer.memoryStorage() });
 const PORT = 3000;
 
 app.use(helmet({
@@ -367,6 +368,22 @@ app.delete('/api/user/addresses/:id', authenticateToken, async (req, res) => {
   res.json({ success: true });
 });
 
+
+app.post('/api/user/avatar', authenticateToken, upload.single('avatar'), async (req, res) => {
+  const userId = (req as any).user.id;
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'No file uploaded' });
+  }
+
+  // Convert to base64
+  const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+  
+  await db.update(schema.users)
+    .set({ avatarUrl: base64Image })
+    .where(eq(schema.users.id, userId));
+    
+  res.json({ success: true, avatarUrl: base64Image });
+});
 
 app.patch('/api/user/profile', authenticateToken, async (req, res) => {
   const userId = (req as any).user.id;
@@ -1813,8 +1830,6 @@ app.get('/api/admin/inventory/warnings', authenticateAdmin, async (req, res) => 
 
 
 
-const upload = multer({ storage: multer.memoryStorage() });
-
 app.post('/api/admin/products/import', authenticateAdmin, upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file' });
   try {
@@ -2130,6 +2145,11 @@ app.patch('/api/admin/users/:id/role', authenticateAdmin, async (req, res) => {
 
 app.patch('/api/admin/users/:id/tier', authenticateAdmin, async (req, res) => {
   await db.update(schema.users).set({ tier: req.body.tier }).where(eq(schema.users.id, req.params.id));
+  res.json({ success: true });
+});
+
+app.patch('/api/admin/users/:id/status', authenticateAdmin, async (req, res) => {
+  await db.update(schema.users).set({ status: req.body.status }).where(eq(schema.users.id, req.params.id));
   res.json({ success: true });
 });
 
