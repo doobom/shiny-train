@@ -157,8 +157,10 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
   
   if (token == null) return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Token missing' });
 
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+  jwt.verify(token, JWT_SECRET, async (err: any, user: any) => {
     if (err) return res.status(401).json({ code: 'UNAUTHORIZED', message: 'Token invalid' });
+    const dbUser = await db.query.users.findFirst({ where: eq(schema.users.id, user.id) });
+    if (!dbUser) return res.status(401).json({ code: 'UNAUTHORIZED', message: 'User not found' });
     (req as any).user = user;
     next();
   });

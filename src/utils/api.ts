@@ -6,7 +6,9 @@ export const fetchWithAuth = async (url: RequestInfo | URL, options?: RequestIni
   if (options?.headers) {
     const h = new Headers(options.headers);
     h.forEach((value, key) => {
-      plainHeaders[key] = value;
+      if (key.toLowerCase() !== 'authorization') {
+        plainHeaders[key] = value;
+      }
     });
   }
   
