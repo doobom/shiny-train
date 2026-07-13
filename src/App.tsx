@@ -42,6 +42,7 @@ export default function App() {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [activePaymentOrderId, setActivePaymentOrderId] = useState<string | null>(null);
   const [cartCount, setCartCount] = useState<number>(0);
+  const [cartBounce, setCartBounce] = useState<boolean>(false);
 
     useEffect(() => {
     document.title = locale === 'zh-HK' ? '香港生活百貨商城' : 'HK Life Mall';

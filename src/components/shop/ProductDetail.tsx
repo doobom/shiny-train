@@ -1,7 +1,7 @@
 import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ShoppingCart, ShieldAlert, BadgeCheck, Share2, AlertCircle } from 'lucide-react';
-import { Locale, ProductSpec } from '../../types/index.ts';
+import { Locale, ProductSpec } from '../../types/index';
 
 interface ProductDetailProps {
   productId: string;
@@ -65,6 +65,7 @@ export default function ProductDetail({
       addedToCart: '成功加入購物車！',
       limitExceeded: '購買數量超出限購規定 (每單限購5件)。',
       sfDesc: '本商品默認使用順豐快遞發貨，支持全港配送。16:00前完成付款的訂單均為當天發貨。',
+      copiedToClipboard: '連結已複製到剪貼簿',
     },
     'en': {
       back: 'Back to Shop',
@@ -82,8 +83,29 @@ export default function ProductDetail({
       addedToCart: 'Successfully added to cart!',
       limitExceeded: 'Quantity exceeds single order purchase limits (Max 5 units).',
       sfDesc: 'This item ships via SF Express with trackable services across Hong Kong. Paid before 16:00 ships same day.',
+      copiedToClipboard: 'Link copied to clipboard',
     }
   }[locale];
+
+  
+  const handleShare = async () => {
+    const shareData = {
+      title: product.nameZh || product.nameEn,
+      text: 'Check out this product!',
+      url: window.location.href,
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        setNotification(dict.copiedToClipboard);
+        setTimeout(() => setNotification(null), 3000);
+      }
+    } catch (err) {
+      console.error('Error sharing:', err);
+    }
+  };
 
   const handleAddToCart = () => {
     if (quantity > 5) {

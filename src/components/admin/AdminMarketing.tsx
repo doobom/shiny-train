@@ -1,13 +1,77 @@
 import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState, useEffect } from 'react';
 import { Tag, PlusCircle, AlertCircle, Percent, Check, Calendar, Trash2 } from 'lucide-react';
-import { Locale, Category } from '../../types/index.ts';
+import { Locale, Category } from '../../types/index';
 
 interface AdminMarketingProps {
   locale: Locale;
 }
 
 export default function AdminMarketing({ locale }: AdminMarketingProps) {
+
+
+  const dict = {
+    'zh-HK': {
+      reductionsTab: '滿減活動',
+      couponsTab: '優惠碼',
+      addReduction: '添加滿減',
+      addCoupon: '添加優惠碼',
+      nameZh: '中文名稱',
+      nameEn: '英文名稱',
+      threshold: '門檻金額',
+      reductionValue: '減免金額',
+      stackable: '可疊加使用',
+      scope: '適用範圍',
+      allProducts: '所有商品',
+      specificCategory: '特定分類',
+      category: '分類',
+      couponCode: '優惠碼',
+      type: '類型',
+      fixedAmount: '固定金額',
+      percentage: '百分比折扣',
+      value: '折扣數值',
+      minOrder: '最低訂單金額 (選填)',
+      save: '儲存',
+      cancel: '取消',
+      active: '啟用中',
+      inactive: '已停用',
+      thresholdFormat: '滿 $',
+      reduceFormat: '減 $',
+      offFormat: '% OFF',
+      minOrderFormat: '最低訂單: $',
+      noMinOrder: '無門檻',
+    },
+    'en': {
+      reductionsTab: 'Full Reductions',
+      couponsTab: 'Coupons',
+      addReduction: 'Add Reduction',
+      addCoupon: 'Add Coupon',
+      nameZh: 'Name (ZH)',
+      nameEn: 'Name (EN)',
+      threshold: 'Threshold',
+      reductionValue: 'Reduction Value',
+      stackable: 'Stackable',
+      scope: 'Scope',
+      allProducts: 'All Products',
+      specificCategory: 'Specific Category',
+      category: 'Category',
+      couponCode: 'Coupon Code',
+      type: 'Type',
+      fixedAmount: 'Fixed Amount',
+      percentage: 'Percentage',
+      value: 'Value',
+      minOrder: 'Min Order Value (Optional)',
+      save: 'Save',
+      cancel: 'Cancel',
+      active: 'Active',
+      inactive: 'Inactive',
+      thresholdFormat: 'Spend $',
+      reduceFormat: 'Get $ off',
+      offFormat: '% OFF',
+      minOrderFormat: 'Min Order: $',
+      noMinOrder: 'No Min Order',
+    }
+  }[locale];
   const [activeTab, setActiveTab] = useState<'reductions' | 'coupons'>('reductions');
   const [reductions, setReductions] = useState<any[]>([]);
   const [discounts, setDiscounts] = useState<any[]>([]);
@@ -124,13 +188,13 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
           onClick={() => setActiveTab('reductions')} 
           className={`pb-2 px-1 text-sm font-bold ${activeTab === 'reductions' ? 'text-neutral-900 border-b-2 border-neutral-900' : 'text-gray-400 hover:text-gray-600'}`}
         >
-          {locale === 'zh-HK' ? '滿減活動' : 'Full Reductions'}
+          {locale === 'zh-HK' ? '{dict.reductionsTab}' : 'Full Reductions'}
         </button>
         <button 
           onClick={() => setActiveTab('coupons')} 
           className={`pb-2 px-1 text-sm font-bold ${activeTab === 'coupons' ? 'text-neutral-900 border-b-2 border-neutral-900' : 'text-gray-400 hover:text-gray-600'}`}
         >
-          {locale === 'zh-HK' ? '優惠碼' : 'Coupon Codes'}
+          {locale === 'zh-HK' ? '{dict.couponsTab}' : 'Coupon Codes'}
         </button>
       </div>
 

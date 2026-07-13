@@ -83,8 +83,6 @@ import { S3Client } from '@aws-sdk/client-s3';
 import multerS3 from 'multer-s3';
 import { Resend } from 'resend';
 
-import rateLimit from 'express-rate-limit';
-
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 1000, // Limit each IP to 1000 requests per `window` (here, per 15 minutes)
@@ -587,8 +585,9 @@ app.get('/api/cart/:userId', authenticateToken, async (req, res) => {
   res.json(mapped);
 });
 
-app.post('/api/cart/items', authenticateToken, async (req, res) => { console.log('POST /api/cart/items body:', req.body);
+app.post('/api/cart/items', authenticateToken, async (req, res) => { console.log('POST /api/cart/items body:', req.body, 'headers:', req.headers);
   const { skuId, qty } = req.body;
+  if (!skuId || qty == null) return res.status(400).json({ success: false, message: 'Missing skuId or qty' });
   const userId = (req as any).user.id;
   const cartId = `cart_${userId}`;
 

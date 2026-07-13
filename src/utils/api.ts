@@ -5,6 +5,7 @@ export const fetchWithAuth = async (url: RequestInfo | URL, options?: RequestIni
     headers.set('Authorization', `Bearer ${token}`);
   }
 
+  console.log('fetchWithAuth options:', options);
   const response = await fetch(url, { ...options, headers });
 
   if (response.status === 401) {
