@@ -133,6 +133,15 @@ export default function App() {
     fetchCartCount();
   }, [tokenReady, userId, currentView]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const productParam = params.get('product');
+    if (productParam) {
+      setSelectedProductId(productParam);
+      setCurrentView('product_detail');
+    }
+  }, []);
+
   // Handle direct buy triggers
   const handleDirectBuy = (orderId: string) => {
     setActivePaymentOrderId(orderId);

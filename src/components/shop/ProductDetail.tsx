@@ -89,16 +89,17 @@ export default function ProductDetail({
 
   
   const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/?product=${product.id}`;
     const shareData = {
       title: product.nameZh || product.nameEn,
       text: 'Check out this product!',
-      url: window.location.href,
+      url: shareUrl,
     };
     try {
       if (navigator.share) {
         await navigator.share(shareData);
       } else {
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(shareUrl);
         setNotification(dict.copiedToClipboard);
         setTimeout(() => setNotification(null), 3000);
       }

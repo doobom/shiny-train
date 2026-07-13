@@ -27,10 +27,10 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
       category: '分類',
       couponCode: '優惠碼',
       type: '類型',
-      fixedAmount: '固定金額',
-      percentage: '百分比折扣',
+      fixedAmount: '固定金額 (分)',
+      percentage: '百分比折扣 (%)',
       value: '折扣數值',
-      minOrder: '最低訂單金額 (選填)',
+      minOrder: '最低訂單金額 (選填) (分)',
       save: '儲存',
       cancel: '取消',
       active: '啟用中',
@@ -40,6 +40,15 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
       offFormat: '% OFF',
       minOrderFormat: '最低訂單: $',
       noMinOrder: '無門檻',
+      descriptions: '描述',
+      action: '操作',
+      yes: '是',
+      no: '否',
+      storewide: '全店',
+      code: '代碼',
+      allowStacking: '允許疊加',
+      none: '無',
+      noCouponCodes: '尚未配置優惠碼',
     },
     'en': {
       reductionsTab: 'Full Reductions',
@@ -57,10 +66,10 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
       category: 'Category',
       couponCode: 'Coupon Code',
       type: 'Type',
-      fixedAmount: 'Fixed Amount',
-      percentage: 'Percentage',
+      fixedAmount: 'Fixed Amount (Cents)',
+      percentage: 'Percentage (%)',
       value: 'Value',
-      minOrder: 'Min Order Value (Optional)',
+      minOrder: 'Min Order Value (Optional) (Cents)',
       save: 'Save',
       cancel: 'Cancel',
       active: 'Active',
@@ -70,6 +79,15 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
       offFormat: '% OFF',
       minOrderFormat: 'Min Order: $',
       noMinOrder: 'No Min Order',
+      descriptions: 'Descriptions',
+      action: 'Action',
+      yes: 'YES',
+      no: 'NO',
+      storewide: 'Storewide',
+      code: 'Code',
+      allowStacking: 'Allow stacking',
+      none: 'None',
+      noCouponCodes: 'No coupon codes configured',
     }
   }[locale];
   const [activeTab, setActiveTab] = useState<'reductions' | 'coupons'>('reductions');
@@ -212,40 +230,39 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
               onClick={() => setShowAddReduction(!showAddReduction)}
               className="bg-neutral-900 hover:bg-neutral-800 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-colors shadow-sm"
             >
-              <PlusCircle className="h-4 w-4" /> Add Reduction
+              <PlusCircle className="h-4 w-4" /> {dict.addReduction}
             </button>
           </div>
-
           {showAddReduction && (
             <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm animate-fade-in">
-              <h2 className="text-sm font-bold text-gray-950 font-display mb-4 border-b pb-2">New Scheme</h2>
+              <h2 className="text-sm font-bold text-gray-950 font-display mb-4 border-b pb-2">{dict.addReduction}</h2>
               <form onSubmit={handleAddReduction} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-gray-600">
                 <div className="space-y-1.5">
-                  <label>Name (ZH)</label>
+                  <label>{dict.nameZh}</label>
                   <input type="text" required value={nameZh} onChange={e => setNameZh(e.target.value)} className="w-full border p-2.5 rounded-lg text-gray-950 font-medium" />
                 </div>
                 <div className="space-y-1.5">
-                  <label>Name (EN)</label>
+                  <label>{dict.nameEn}</label>
                   <input type="text" required value={nameEn} onChange={e => setNameEn(e.target.value)} className="w-full border p-2.5 rounded-lg text-gray-950 font-medium" />
                 </div>
                 <div className="space-y-1.5">
-                  <label>Threshold Value (HK$)</label>
+                  <label>{dict.threshold} (HK$)</label>
                   <input type="number" required value={threshold / 100} onChange={e => setThreshold(Math.round(Number(e.target.value) * 100))} className="w-full border p-2.5 rounded-lg text-gray-950 font-mono" />
                 </div>
                 <div className="space-y-1.5">
-                  <label>Discount Value (HK$)</label>
+                  <label>{dict.reductionValue} (HK$)</label>
                   <input type="number" required value={reductionValue / 100} onChange={e => setReductionValue(Math.round(Number(e.target.value) * 100))} className="w-full border p-2.5 rounded-lg text-gray-950 font-mono" />
                 </div>
                 <div className="space-y-1.5">
-                  <label>Scope</label>
+                  <label>{dict.scope}</label>
                   <select value={scope} onChange={e => setScope(e.target.value as any)} className="w-full border p-2.5 rounded-lg text-gray-950 bg-white font-medium">
-                    <option value="all">Storewide</option>
-                    <option value="category">Category Specific</option>
+                    <option value="all">{dict.allProducts}</option>
+                    <option value="category">{dict.specificCategory}</option>
                   </select>
                 </div>
                 {scope === 'category' && (
                   <div className="space-y-1.5">
-                    <label>Target Category</label>
+                    <label>{dict.category}</label>
                     <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full border p-2.5 rounded-lg text-gray-950 bg-white font-medium">
                       {categories.map(c => <option key={c.id} value={c.id}>{locale === 'zh-HK' ? c.nameZh : c.nameEn}</option>)}
                     </select>
@@ -259,7 +276,7 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
                     onChange={e => setStackable(e.target.checked)} 
                     className="w-4 h-4 rounded text-neutral-900 border-gray-300 focus:ring-neutral-900"
                   />
-                  <label htmlFor="stackable_chk" className="text-xs font-semibold text-gray-700 cursor-pointer">Allow stacking</label>
+                  <label htmlFor="stackable_chk" className="text-xs font-semibold text-gray-700 cursor-pointer">{dict.allowStacking}</label>
                 </div>
                 <div className="md:col-span-2 pt-2 flex gap-3">
                   <button type="submit" className="bg-neutral-950 hover:bg-neutral-800 text-white font-bold px-6 py-2.5 rounded-xl">{dict.save}</button>
@@ -274,12 +291,12 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100 text-gray-400 font-bold uppercase tracking-wider">
-                    <th className="p-4">Descriptions</th>
-                    <th className="p-4">Threshold</th>
-                    <th className="p-4">Reduction</th>
-                    <th className="p-4">Stackable</th>
-                    <th className="p-4">Scope</th>
-                    <th className="p-4 text-right">Action</th>
+                    <th className="p-4">{dict.descriptions}</th>
+                    <th className="p-4">{dict.threshold}</th>
+                    <th className="p-4">{dict.reductionValue}</th>
+                    <th className="p-4">{dict.stackable}</th>
+                    <th className="p-4">{dict.scope}</th>
+                    <th className="p-4 text-right">{dict.action}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
@@ -290,10 +307,10 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
                       <td className="p-4 font-mono font-bold text-amber-600">-HK${(rule.reductionCents / 100).toFixed(2)}</td>
                       <td className="p-4">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${rule.stackable ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
-                          {rule.stackable ? 'YES' : 'NO'}
+                          {rule.stackable ? dict.yes : dict.no}
                         </span>
                       </td>
-                      <td className="p-4 font-semibold text-gray-500">{rule.scope === 'all' ? 'Storewide' : 'Category'}</td>
+                      <td className="p-4 font-semibold text-gray-500">{rule.scope === 'all' ? dict.storewide : dict.category}</td>
                       <td className="p-4 text-right">
                         <button onClick={() => handleDeleteReduction(rule.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"><Trash2 className="h-4 w-4" /></button>
                       </td>
@@ -322,14 +339,14 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
               <h2 className="text-sm font-bold text-gray-950 font-display mb-4 border-b pb-2">{dict.addCoupon}</h2>
               <form onSubmit={handleAddCoupon} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-gray-600">
                 <div className="space-y-1.5">
-                  <label>{dict.couponCode} (e.g. SUMMER10)</label>
+                  <label>{dict.couponCode}</label>
                   <input type="text" required value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} className="w-full border p-2.5 rounded-lg text-gray-950 font-medium uppercase" />
                 </div>
                 <div className="space-y-1.5">
                   <label>{dict.type}</label>
                   <select value={couponType} onChange={e => setCouponType(e.target.value as any)} className="w-full border p-2.5 rounded-lg text-gray-950 bg-white font-medium">
-                    <option value="fixed">{dict.fixedAmount} (Cents)</option>
-                    <option value="percentage">{dict.percentage} (%)</option>
+                    <option value="fixed">{dict.fixedAmount}</option>
+                    <option value="percentage">{dict.percentage}</option>
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -337,7 +354,7 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
                   <input type="number" required value={couponValue} onChange={e => setCouponValue(Number(e.target.value))} className="w-full border p-2.5 rounded-lg text-gray-950 font-mono" />
                 </div>
                 <div className="space-y-1.5">
-                  <label>{dict.minOrder} (Cents)</label>
+                  <label>{dict.minOrder}</label>
                   <input type="number" value={couponMinOrder} onChange={e => setCouponMinOrder(Number(e.target.value))} className="w-full border p-2.5 rounded-lg text-gray-950 font-mono" />
                 </div>
                 <div className="md:col-span-2 pt-2 flex gap-3">
@@ -347,18 +364,17 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
               </form>
             </div>
           )}
-
           <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100 text-gray-400 font-bold uppercase tracking-wider">
-                    <th className="p-4">Code</th>
-                    <th className="p-4">Type</th>
-                    <th className="p-4">Value</th>
-                    <th className="p-4">Min Order</th>
-                    <th className="p-4">Active</th>
-                    <th className="p-4 text-right">Action</th>
+                    <th className="p-4">{dict.code}</th>
+                    <th className="p-4">{dict.type}</th>
+                    <th className="p-4">{dict.value}</th>
+                    <th className="p-4">{dict.minOrder}</th>
+                    <th className="p-4">{dict.active}</th>
+                    <th className="p-4 text-right">{dict.action}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
@@ -369,10 +385,10 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
                       <td className="p-4 font-mono font-bold text-amber-600">
                         {d.type === 'percentage' ? `${d.value}%` : `-HK${(d.value / 100).toFixed(2)}`}
                       </td>
-                      <td className="p-4 font-mono text-gray-500">{d.minOrderValueCents ? `HK${(d.minOrderValueCents / 100).toFixed(2)}` : 'None'}</td>
+                      <td className="p-4 font-mono text-gray-500">{d.minOrderValueCents ? `HK${(d.minOrderValueCents / 100).toFixed(2)}` : dict.none}</td>
                       <td className="p-4">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${d.active ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                          {d.active ? 'YES' : 'NO'}
+                          {d.active ? dict.yes : dict.no}
                         </span>
                       </td>
                       <td className="p-4 text-right">
@@ -382,7 +398,7 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
                   ))}
                   {discounts.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-gray-400">No coupon codes configured</td>
+                      <td colSpan={6} className="p-8 text-center text-gray-400">{dict.noCouponCodes}</td>
                     </tr>
                   )}
                 </tbody>

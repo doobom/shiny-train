@@ -12,7 +12,7 @@ interface UserProfileProps {
 }
 
 export default function UserProfile({ userId, locale, onPayNow }: UserProfileProps) {
-  const token = localStorage.getItem('token') || '';
+  const token = localStorage.getItem('jwt_token') || '';
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'tickets' | 'faqs'>('profile');
   const [profileForm, setProfileForm] = useState({ oldPassword: '', newPassword: '', addressRecipient: '', addressPhone: '', addressDetail: '' });

@@ -1,5 +1,5 @@
 export const fetchWithAuth = async (url: RequestInfo | URL, options?: RequestInit) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('jwt_token');
   
   // Convert existing headers to a plain object
   const plainHeaders: Record<string, string> = {};
@@ -17,11 +17,9 @@ export const fetchWithAuth = async (url: RequestInfo | URL, options?: RequestIni
   const response = await fetch(url, { ...options, headers: plainHeaders });
 
   if (response.status === 401) {
+    localStorage.removeItem('jwt_token');
     localStorage.removeItem('token');
     window.dispatchEvent(new CustomEvent('auth-error', { detail: 'Unauthorized' }));
-    // In a real app, you might want to redirect to login:
-    // window.location.href = '/'; 
-    // But since we use React state, we dispatch an event that App.tsx can listen to.
   } else if (response.status === 403) {
     alert('Access Denied: You do not have permission to perform this action.');
   }
