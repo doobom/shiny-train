@@ -198,8 +198,8 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
                   <label htmlFor="stackable_chk" className="text-xs font-semibold text-gray-700 cursor-pointer">Allow stacking</label>
                 </div>
                 <div className="md:col-span-2 pt-2 flex gap-3">
-                  <button type="submit" className="bg-neutral-950 hover:bg-neutral-800 text-white font-bold px-6 py-2.5 rounded-xl">Save</button>
-                  <button type="button" onClick={() => setShowAddReduction(false)} className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2.5 rounded-xl">Cancel</button>
+                  <button type="submit" className="bg-neutral-950 hover:bg-neutral-800 text-white font-bold px-6 py-2.5 rounded-xl">{locale === "zh-HK" ? "保存" : "Save"}</button>
+                  <button type="button" onClick={() => setShowAddReduction(false)} className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2.5 rounded-xl">{locale === "zh-HK" ? "取消" : "Cancel"}</button>
                 </div>
               </form>
             </div>
@@ -277,8 +277,8 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
                   <input type="number" value={couponMinOrder} onChange={e => setCouponMinOrder(Number(e.target.value))} className="w-full border p-2.5 rounded-lg text-gray-950 font-mono" />
                 </div>
                 <div className="md:col-span-2 pt-2 flex gap-3">
-                  <button type="submit" className="bg-neutral-950 hover:bg-neutral-800 text-white font-bold px-6 py-2.5 rounded-xl">Save</button>
-                  <button type="button" onClick={() => setShowAddCoupon(false)} className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2.5 rounded-xl">Cancel</button>
+                  <button type="submit" className="bg-neutral-950 hover:bg-neutral-800 text-white font-bold px-6 py-2.5 rounded-xl">{locale === "zh-HK" ? "保存" : "Save"}</button>
+                  <button type="button" onClick={() => setShowAddCoupon(false)} className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2.5 rounded-xl">{locale === "zh-HK" ? "取消" : "Cancel"}</button>
                 </div>
               </form>
             </div>

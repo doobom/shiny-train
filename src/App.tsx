@@ -163,6 +163,7 @@ export default function App() {
       tagline: '正品直郵 • 極速順豐 • 安全支付',
       shopTab: '精品商城',
       adminConsole: '後台管理系統',
+      adminDrawer: '管理員面板',
       cartLabel: '購物車',
       profileLabel: '我的帳戶',
       customerSwitch: '切換顧客身份',
@@ -175,6 +176,7 @@ export default function App() {
       tagline: 'Direct Dispatch • SF Express • Secured Pay',
       shopTab: 'Shop Catalog',
       adminConsole: 'Admin Console',
+      adminDrawer: 'Administrator Drawer',
       cartLabel: 'My Cart',
       profileLabel: 'My Profile',
       customerSwitch: 'Switch Persona',
@@ -231,13 +233,25 @@ export default function App() {
               </button>
             )}
             {tokenReady && JSON.parse(localStorage.getItem('user') || '{}')?.role === 'admin' && !isAdminMode && (
-              <button
-                onClick={() => setIsAdminMode(true)}
-                className="font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 text-gray-500 hover:text-gray-950"
-              >
-                <Shield className="h-4 w-4" />
-                <span className="hidden sm:inline">{dict.adminConsole}</span>
-              </button>
+              (import.meta.env.B_FRONTEND_URL || import.meta.env.VITE_B_FRONTEND_URL) ? (
+                <a
+                  href={(import.meta.env.B_FRONTEND_URL || import.meta.env.VITE_B_FRONTEND_URL)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 text-gray-500 hover:text-gray-950"
+                >
+                  <Shield className="h-4 w-4" />
+                  <span className="hidden sm:inline">{dict.adminConsole}</span>
+                </a>
+              ) : (
+                <button
+                  onClick={() => setIsAdminMode(true)}
+                  className="font-bold text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 text-gray-500 hover:text-gray-950"
+                >
+                  <Shield className="h-4 w-4" />
+                  <span className="hidden sm:inline">{dict.adminConsole}</span>
+                </button>
+              )
             )}
             <button
               onClick={toggleLanguage}
@@ -402,11 +416,18 @@ export default function App() {
             {/* Admin sidebar */}
             <div className="bg-white p-5 rounded-2xl border border-gray-150 h-max space-y-4">
               <div className="border-b pb-3.5 mb-2">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Administrator Drawer</span>
-                <h3 className="text-sm font-black text-gray-950 mt-1 font-display flex items-center gap-1">
-                  <Shield className="h-4 w-4 text-amber-500" />
-                  {dict.adminConsole}
-                </h3>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">{dict.adminDrawer}</span>
+                {(import.meta.env.C_FRONTEND_URL || import.meta.env.VITE_C_FRONTEND_URL) ? (
+                  <a href={(import.meta.env.C_FRONTEND_URL || import.meta.env.VITE_C_FRONTEND_URL)} target="_blank" rel="noopener noreferrer" className="text-sm font-black text-gray-950 mt-1 font-display flex items-center gap-1 hover:underline">
+                    <Shield className="h-4 w-4 text-amber-500" />
+                    {dict.adminConsole}
+                  </a>
+                ) : (
+                  <h3 className="text-sm font-black text-gray-950 mt-1 font-display flex items-center gap-1">
+                    <Shield className="h-4 w-4 text-amber-500" />
+                    {dict.adminConsole}
+                  </h3>
+                )}
               </div>
 
               <div className="flex flex-col gap-1 text-xs font-semibold">

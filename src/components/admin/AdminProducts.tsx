@@ -45,6 +45,22 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
   const [specNameEn, setSpecNameEn] = useState('Standard Option');
   const [initialStock, setInitialStock] = useState(100);
   const [warnThreshold, setWarnThreshold] = useState(15);
+
+  const resetForm = () => {
+    setEditingProductId(null);
+    setNameZh('');
+    setNameEn('');
+    setDescriptionZh('');
+    setDescriptionEn('');
+    setOriginalCents(0);
+    setAfterCents(0);
+    setCategoryId('');
+    setImageUrls('');
+    setSpecNameZh('');
+    setSpecNameEn('');
+    setInitialStock(0);
+    setWarnThreshold(15);
+  };
   
   const [editingSkuId, setEditingSkuId] = useState<string | null>(null);
   const [quickStock, setQuickStock] = useState<number>(0);
@@ -93,7 +109,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
         body: formData
       });
       const data = await res.json();
-      if (data.url) setImageUrl(data.url);
+      if (data.url) setImageUrls(prev => prev ? prev + ', ' + data.url : data.url);
     } catch (err) {
       console.error(err);
     } finally {
@@ -360,8 +376,8 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
               </div>
 
               <div className="border-t border-gray-200 pt-4 flex justify-end gap-2">
-                <button type="button" onClick={() => { setShowAddForm(false); resetForm(); }} className="px-4 py-2 text-xs font-bold border rounded-lg text-gray-600">Cancel</button>
-                <button type="submit" className="px-4 py-2 text-xs font-bold bg-gray-900 text-white rounded-lg">{editingProductId ? 'Update' : 'Publish'}</button>
+                <button type="button" onClick={() => { setShowAddForm(false); resetForm(); }} className="px-4 py-2 text-xs font-bold border rounded-lg text-gray-600">{locale === 'zh-HK' ? '取消' : 'Cancel'}</button>
+                <button type="submit" className="px-4 py-2 text-xs font-bold bg-gray-900 text-white rounded-lg">{editingProductId ? (locale === 'zh-HK' ? '更新' : 'Update') : (locale === 'zh-HK' ? '發布' : 'Publish')}</button>
               </div>
             </form>
           )}
@@ -382,8 +398,8 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
                   <input type="number" value={quickThreshold} onChange={e => setQuickThreshold(Number(e.target.value))} className="p-2 rounded border w-24 text-xs font-mono" />
                 </div>
                 <div className="flex items-end gap-2">
-                  <button onClick={() => handleUpdateStock(editingSkuId)} className="bg-amber-600 text-white px-3 py-2 rounded text-xs font-bold">Save</button>
-                  <button onClick={() => setEditingSkuId(null)} className="bg-white text-gray-600 px-3 py-2 rounded text-xs font-bold border">Cancel</button>
+                  <button onClick={() => handleUpdateStock(editingSkuId)} className="bg-amber-600 text-white px-3 py-2 rounded text-xs font-bold">{locale === "zh-HK" ? "保存" : "Save"}</button>
+                  <button onClick={() => setEditingSkuId(null)} className="bg-white text-gray-600 px-3 py-2 rounded text-xs font-bold border">{locale === 'zh-HK' ? '取消' : 'Cancel'}</button>
                 </div>
               </div>
             </div>

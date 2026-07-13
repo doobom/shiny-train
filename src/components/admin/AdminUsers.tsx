@@ -246,7 +246,7 @@ export default function AdminUsers({ locale }: { locale: 'zh-HK' | 'en' }) {
                       <input type="email" required value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} className="w-full border p-2 rounded-lg text-xs" />
                     </div>
                     <div className="flex gap-2 justify-end">
-                      <button type="button" onClick={() => setShowInvite(false)} className="px-4 py-2 text-xs font-bold text-gray-500">Cancel</button>
+                      <button type="button" onClick={() => setShowInvite(false)} className="px-4 py-2 text-xs font-bold text-gray-500">{locale === "zh-HK" ? "取消" : "Cancel"}</button>
                       <button type="submit" className="px-4 py-2 text-xs font-bold bg-neutral-900 text-white rounded-lg">Invite</button>
                     </div>
                   </div>
