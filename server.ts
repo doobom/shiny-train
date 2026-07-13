@@ -1336,6 +1336,7 @@ app.post('/api/admin/init-db', async (req, res) => {
         "email" text NOT NULL UNIQUE,
         "password_hash" text NOT NULL,
         "phone_encrypted" text,
+        "avatar_url" text,
         "locale" text DEFAULT 'zh-HK',
         "status" text DEFAULT 'active',
         "role" text DEFAULT 'customer',
@@ -1614,6 +1615,7 @@ app.post('/api/admin/init-db', async (req, res) => {
       await db.execute(sql.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS locale VARCHAR(20) DEFAULT 'zh-HK'`));
       await db.execute(sql.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'`));
       await db.execute(sql.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_encrypted VARCHAR(255)`));
+      await db.execute(sql.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(255)`));
       await db.execute(sql.raw(`ALTER TABLE products ADD COLUMN IF NOT EXISTS images JSONB DEFAULT '[]'`));
       await db.execute(sql.raw(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS link_url VARCHAR(255)`));
       await db.execute(sql.raw(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS disabled BOOLEAN DEFAULT FALSE`));

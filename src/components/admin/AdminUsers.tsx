@@ -6,6 +6,7 @@ export default function AdminUsers({ locale }: { locale: 'zh-HK' | 'en' }) {
   const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'tiers'>('users');
 
   const [users, setUsers] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [roles, setRoles] = useState<any[]>([]);
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
   const allModules = ['orders', 'products', 'users', 'marketing', 'settings', 'content', 'manage_users'];
@@ -245,7 +246,14 @@ export default function AdminUsers({ locale }: { locale: 'zh-HK' | 'en' }) {
 
       {activeTab === 'users' && (
         <>
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-between mb-4">
+            <input 
+              type="text"
+              placeholder={locale === 'zh-HK' ? '搜尋用戶...' : 'Search users...'}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-xs font-medium focus:ring-1 focus:ring-neutral-900 outline-none w-64"
+            />
             <button onClick={() => setShowInvite(true)} className="bg-neutral-900 text-white text-xs font-bold px-4 py-2 rounded-lg">
               + {locale === 'zh-HK' ? '邀請管理員' : 'Invite Admin'}
             </button>
@@ -282,7 +290,7 @@ export default function AdminUsers({ locale }: { locale: 'zh-HK' | 'en' }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {users.map(user => (
+                {users.filter(u => u.email.toLowerCase().includes(searchTerm.toLowerCase())).map(user => (
                   <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
