@@ -1,12 +1,20 @@
 export const fetchWithAuth = async (url: RequestInfo | URL, options?: RequestInit) => {
   const token = localStorage.getItem('token');
-  const headers = new Headers(options?.headers);
+  
+  // Convert existing headers to a plain object
+  const plainHeaders: Record<string, string> = {};
+  if (options?.headers) {
+    const h = new Headers(options.headers);
+    h.forEach((value, key) => {
+      plainHeaders[key] = value;
+    });
+  }
+  
   if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
+    plainHeaders['Authorization'] = `Bearer ${token}`;
   }
 
-  console.log('fetchWithAuth options:', options);
-  const response = await fetch(url, { ...options, headers });
+  const response = await fetch(url, { ...options, headers: plainHeaders });
 
   if (response.status === 401) {
     localStorage.removeItem('token');
