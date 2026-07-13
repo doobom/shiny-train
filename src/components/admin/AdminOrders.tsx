@@ -198,7 +198,7 @@ export default function AdminOrders({ locale }: AdminOrdersProps) {
     document.body.removeChild(link);
 
       }} className="bg-gray-900 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-800 absolute right-6 top-6">
-        Export CSV
+        {locale === 'zh-HK' ? '匯出報表' : 'Export CSV'}
       </button>
       {/* Filter and search bars */}
       <div className="flex flex-wrap gap-3 items-center justify-between bg-gray-50/50 p-4 rounded-xl border border-gray-100">

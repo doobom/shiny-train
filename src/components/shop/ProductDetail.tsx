@@ -265,12 +265,12 @@ export default function ProductDetail({
                   ) : isLowStock ? (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                       <AlertCircle className="h-3.5 w-3.5" />
-                      {dict.lowStock} (僅餘 {selectedSpec.availableStock} 件)
+                      {dict.lowStock} ({locale === 'zh-HK' ? '僅餘' : 'Only'} {selectedSpec.availableStock} {locale === 'zh-HK' ? '件' : 'left'})
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                       <BadgeCheck className="h-3.5 w-3.5" />
-                      {dict.available} (現貨充足)
+                      {dict.available}
                     </span>
                   )}
                 </div>

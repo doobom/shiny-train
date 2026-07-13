@@ -21,3 +21,43 @@ h1, h2, h3, h4 {
 .font-mono {
   font-family: var(--font-mono);
 }
+
+/* Dark Mode Overrides */
+.dark {
+  background-color: #09090b !important;
+  color: #fafafa !important;
+  color-scheme: dark;
+}
+
+.dark .bg-white { background-color: #18181b !important; }
+.dark .bg-gray-50 { background-color: #09090b !important; }
+.dark .bg-gray-100 { background-color: #27272a !important; }
+.dark .text-gray-900 { color: #fafafa !important; }
+.dark .text-gray-800 { color: #e4e4e7 !important; }
+.dark .text-gray-700 { color: #d4d4d8 !important; }
+.dark .text-gray-600 { color: #a1a1aa !important; }
+.dark .text-gray-500 { color: #71717a !important; }
+.dark .border-gray-200 { border-color: #27272a !important; }
+.dark .border-gray-100 { border-color: #18181b !important; }
+.dark .border-neutral-200 { border-color: #27272a !important; }
+
+/* Invert buttons that were dark in light mode */
+.dark .bg-neutral-900, .dark .bg-neutral-950 {
+  background-color: #fafafa !important;
+  color: #09090b !important;
+}
+.dark .text-neutral-900, .dark .text-neutral-950 {
+  color: #fafafa !important;
+}
+.dark .text-white {
+  color: #fafafa !important;
+}
+.dark .bg-amber-500 {
+  background-color: #f59e0b !important;
+  color: #18181b !important;
+}
+.dark input, .dark select, .dark textarea {
+  background-color: #18181b !important;
+  color: #fafafa !important;
+  border-color: #3f3f46 !important;
+}

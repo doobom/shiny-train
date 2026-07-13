@@ -1,5 +1,6 @@
 import { fetchWithAuth as apiFetch } from '../../utils/api';
 import React, { useState } from 'react';
+import { Locale } from '../../types/index.ts';
 
 async function hashPassword(password: string) {
   const encoder = new TextEncoder();
@@ -11,10 +12,11 @@ async function hashPassword(password: string) {
 }
 
 interface AuthViewProps {
+  locale: Locale;
   onLoginSuccess: (token: string, user: any) => void;
 }
 
-export default function AuthView({ onLoginSuccess }: AuthViewProps) {
+export default function AuthView({ locale, onLoginSuccess }: AuthViewProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [isForgot, setIsForgot] = useState(false);
   const [email, setEmail] = useState('');
@@ -83,7 +85,7 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
       <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 max-w-sm w-full">
         <h2 className="text-xl font-bold mb-6 text-center">
-          {isForgot ? 'Reset Password' : isLogin ? 'Login to your account' : 'Create an account'}
+          {isForgot ? (locale === "zh-HK" ? "重設密碼" : "Reset Password") : isLogin ? (locale === "zh-HK" ? "登入帳戶" : "Login to your account") : (locale === "zh-HK" ? "建立帳戶" : "Create an account")}
         </h2>
         
         {msg && (
@@ -99,7 +101,7 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Email</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">{locale === "zh-HK" ? "電郵地址" : "Email"}</label>
             <input 
               type="email" 
               required
@@ -111,7 +113,7 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
           </div>
           {!isForgot && (
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Password</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">{locale === "zh-HK" ? "密碼" : "Password"}</label>
             <input 
               type="password" 
               required
@@ -127,16 +129,16 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
             type="submit" 
             className="w-full bg-neutral-950 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-neutral-800 transition-colors"
           >
-            {isForgot ? 'Send Reset Link' : isLogin ? 'Sign In' : 'Sign Up'}
+            {isForgot ? (locale === "zh-HK" ? "發送重設連結" : "Send Reset Link") : isLogin ? (locale === "zh-HK" ? "登入" : "Sign In") : (locale === "zh-HK" ? "註冊" : "Sign Up")}
           </button>
         </form>
 
         <div className="mt-6 text-center text-xs text-gray-500">
           {isForgot ? (
-            <button type="button" onClick={() => setIsForgot(false)} className="font-bold text-neutral-900 hover:underline">Back to Login</button>
+            <button type="button" onClick={() => setIsForgot(false)} className="font-bold text-neutral-900 hover:underline">{locale === "zh-HK" ? "返回登入" : "Back to Login"}</button>
           ) : (
             <>
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
+              {isLogin ? (locale === "zh-HK" ? "還未有帳戶？ " : "Don't have an account? ") : (locale === "zh-HK" ? "已有帳戶？ " : "Already have an account? ")}
               <button 
                 type="button"
                 onClick={() => { setIsLogin(!isLogin); setIsForgot(false); }}
@@ -146,7 +148,7 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
               </button>
               {isLogin && (
                 <div className="mt-2">
-                  <button type="button" onClick={() => setIsForgot(true)} className="font-bold text-neutral-900 hover:underline">Forgot Password?</button>
+                  <button type="button" onClick={() => setIsForgot(true)} className="font-bold text-neutral-900 hover:underline">{locale === "zh-HK" ? "忘記密碼？" : "Forgot Password?"}</button>
                 </div>
               )}
             </>

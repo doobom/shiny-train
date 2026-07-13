@@ -50,13 +50,13 @@ export default function ShopHome({ locale, onSelectProduct }: ShopHomeProps) {
 
   // Fetch filtered products dynamically
   useEffect(() => {
-    let url = `/api/products?keyword=${searchQuery}`;
+    let url = `/api/products?q=${searchQuery}`;
     if (selectedCategory) url += `&categoryId=${selectedCategory}`;
     if (sortBy !== 'default') url += `&sort=${sortBy}`;
 
-    if (priceRange === 'under100') url += `&priceMax=10000`;
-    else if (priceRange === '100to200') url += `&priceMin=10000&priceMax=20000`;
-    else if (priceRange === 'over200') url += `&priceMin=20000`;
+    if (priceRange === 'under100') url += `&maxPrice=10000`;
+    else if (priceRange === '100to200') url += `&minPrice=10000&maxPrice=20000`;
+    else if (priceRange === 'over200') url += `&minPrice=20000`;
 
     apiFetch(url)
       .then(res => res.json())

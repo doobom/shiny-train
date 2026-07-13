@@ -22,7 +22,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   
-  const quillModules = {
+  const quillModules = React.useMemo(() => ({
     toolbar: [
       [{ 'header': [1, 2, false] }],
       ['bold', 'italic', 'underline', 'strike', 'blockquote'],
@@ -30,7 +30,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
       ['link', 'image'],
       ['clean']
     ],
-  };
+  }), []);
   const [nameZh, setNameZh] = useState('');
   const [nameEn, setNameEn] = useState('');
   const [descriptionZh, setDescriptionZh] = useState('');
@@ -325,7 +325,7 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
               {locale === 'zh-HK' ? '匯出' : 'Export'}
             </button>
             <button 
-              onClick={() => { if (!showAddForm) resetForm(); setShowAddForm(!showAddForm); }}
+              onClick={() => { resetForm(); setShowAddForm(true); }}
               className="bg-neutral-900 hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2"
             >
               <PlusCircle className="h-4 w-4" />
@@ -339,25 +339,25 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
             <form onSubmit={handleCreateProduct} className="bg-gray-50 p-5 rounded-2xl border border-gray-200 mb-4 space-y-4 animate-fade-in">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Product Name (ZH)</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">{locale === "zh-HK" ? "商品名稱 (中文)" : "Product Name (ZH)"}</label>
                   <input type="text" required value={nameZh} onChange={e=>setNameZh(e.target.value)} className="w-full border p-2 rounded text-xs" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Product Name (EN)</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">{locale === "zh-HK" ? "商品名稱 (英文)" : "Product Name (EN)"}</label>
                   <input type="text" required value={nameEn} onChange={e=>setNameEn(e.target.value)} className="w-full border p-2 rounded text-xs" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Category</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">{locale === "zh-HK" ? "分類" : "Category"}</label>
                   <select value={categoryId} onChange={e=>setCategoryId(e.target.value)} className="w-full border p-2 rounded text-xs bg-white">
                     {categories.map(c => <option key={c.id} value={c.id}>{c.nameZh}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase">Image URL (or upload)</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">{locale === "zh-HK" ? "圖片網址 (或上傳)" : "Image URL (or upload)"}</label>
                   <div className="flex gap-2">
                     <textarea rows={2} value={imageUrls} onChange={e=>setImageUrls(e.target.value)} className="flex-1 w-full border p-2 rounded text-xs" />
                     <label className="cursor-pointer bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded text-xs font-bold flex items-center">
-                      {isUploading ? '...' : 'Upload'}
+                      {isUploading ? '...' : (locale === 'zh-HK' ? '上傳' : 'Upload')}
                       <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
                     </label>
                   </div>
@@ -366,11 +366,11 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
               
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase block">Description (ZH)</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase block">{locale === "zh-HK" ? "詳細描述 (中文)" : "Description (ZH)"}</label>
                   <ReactQuill modules={quillModules} theme="snow" value={descriptionZh} onChange={setDescriptionZh} className="bg-white" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase block">Description (EN)</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase block">{locale === "zh-HK" ? "詳細描述 (英文)" : "Description (EN)"}</label>
                   <ReactQuill modules={quillModules} theme="snow" value={descriptionEn} onChange={setDescriptionEn} className="bg-white" />
                 </div>
               </div>

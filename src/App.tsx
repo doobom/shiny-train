@@ -1,6 +1,6 @@
 import { fetchWithAuth as apiFetch } from './utils/api';
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, User, Shield, HelpCircle, LogIn, LogOut, CheckCircle, Store, Layers } from 'lucide-react';
+import { ShoppingCart, User, Shield, HelpCircle, LogIn, LogOut, CheckCircle, Store, Layers, Moon, Sun } from 'lucide-react';
 import { Locale } from './types/index.ts';
 
 // Core views
@@ -31,6 +31,7 @@ export default function App() {
   // @ts-ignore
   const appMode = import.meta.env.VITE_APP_MODE || 'both'; // 'user' | 'admin' | 'both'
   const [isAdminMode, setIsAdminMode] = useState<boolean>(appMode === 'admin' || window.location.search.includes('mode=admin'));
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentView, setCurrentView] = useState<ViewState>('shop_home');
   const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('dashboard');
 
@@ -293,7 +294,7 @@ export default function App() {
                   <ShoppingCart className="h-4 w-4" />
                   <span className="hidden sm:inline">{dict.cartLabel}</span>
                   {cartCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-amber-500 text-black font-black text-[9px] w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white font-mono shadow-sm">
+                    <span className={`absolute -top-1 -right-1 bg-amber-500 text-black font-black text-[9px] w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white font-mono shadow-sm transition-transform duration-300 ${cartBounce ? "scale-150" : "scale-100"}`}>
                       {cartCount}
                     </span>
                   )}
@@ -325,7 +326,7 @@ export default function App() {
         {window.location.pathname === '/password/reset' ? (
           <PasswordReset />
         ) : !tokenReady && (isAdminMode || !['shop_home', 'product_detail', 'cart'].includes(currentView)) ? (
-          <AuthView onLoginSuccess={handleLoginSuccess} />
+          <AuthView locale={locale} onLoginSuccess={handleLoginSuccess} />
         ) : !isAdminMode ? (
           // Renders C-End Customer shopping screens
           <div className="space-y-6">
@@ -345,6 +346,8 @@ export default function App() {
                 onRequestLogin={() => setCurrentView('profile')}
                 onAddToCart={() => {
                   fetchCartCount();
+                  setCartBounce(true);
+                  setTimeout(() => setCartBounce(false), 300);
                 }}
                 onInstantBuy={(skuId, qty) => {
                   if (!userId) {
