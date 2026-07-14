@@ -1,2 +1,2 @@
-ALTER TABLE "discounts" ADD COLUMN "name_zh" text;--> statement-breakpoint
-ALTER TABLE "discounts" ADD COLUMN "name_en" text;
+ALTER TABLE "discounts" ADD COLUMN IF NOT EXISTS "name_zh" text;--> statement-breakpoint
+ALTER TABLE "discounts" ADD COLUMN IF NOT EXISTS "name_en" text;

@@ -1,4 +1,4 @@
-CREATE TABLE "promo_codes" (
+CREATE TABLE IF NOT EXISTS "promo_codes" (
 	"id" text PRIMARY KEY NOT NULL,
 	"code" text NOT NULL,
 	"type" text NOT NULL,
@@ -11,5 +11,5 @@ CREATE TABLE "promo_codes" (
 	CONSTRAINT "promo_codes_code_unique" UNIQUE("code")
 );
 --> statement-breakpoint
-ALTER TABLE "addresses" ADD COLUMN "remark" text;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "avatar_url" text;
+ALTER TABLE "addresses" ADD COLUMN IF NOT EXISTS "remark" text;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "avatar_url" text;
