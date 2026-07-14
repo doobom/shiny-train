@@ -739,15 +739,15 @@ app.post('/api/checkout/preview', authenticateToken, async (req, res) => {
 
   let promoDiscount = 0;
   if (promoCode) {
-    const p = await db.query.discounts.findFirst({ where: eq(schema.discounts.code, promoCode) });
-    if (p && p.active && (!p.validUntil || new Date(p.validUntil) > new Date()) && (!p.minOrderValueCents || subtotalCents >= p.minOrderValueCents)) {
-      if (p.type === 'percentage') {
+    const p = await db.query.promoCodes.findFirst({ where: eq(schema.promoCodes.code, promoCode) });
+    if (p && p.active && (!p.expiresAt || new Date(p.expiresAt) > new Date()) && (!p.maxUsage || p.currentUsage! < p.maxUsage)) {
+      if (p.type === 'percent') {
         promoDiscount = Math.floor(subtotalCents * (p.value / 100));
       } else {
         promoDiscount = p.value;
       }
     } else if (p) {
-       return res.status(400).json({ error: 'Promo code invalid or minimum order value not reached.' });
+       return res.status(400).json({ error: 'Promo code invalid, expired, or usage limit reached.' });
     } else {
        return res.status(404).json({ error: 'Promo code not found.' });
     }
@@ -836,6 +836,23 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
       }
     }
     discountCents += bestExclusive;
+
+    if (promoCode) {
+      const p = await tx.query.promoCodes.findFirst({ where: eq(schema.promoCodes.code, promoCode) });
+      if (p && p.active && (!p.expiresAt || new Date(p.expiresAt) > new Date()) && (!p.maxUsage || p.currentUsage! < p.maxUsage)) {
+        let promoDiscount = 0;
+        if (p.type === 'percent') {
+          promoDiscount = Math.floor(totalCents * (p.value / 100));
+        } else {
+          promoDiscount = p.value;
+        }
+        discountCents += promoDiscount;
+        await tx.update(schema.promoCodes).set({ currentUsage: (p.currentUsage || 0) + 1 }).where(eq(schema.promoCodes.id, p.id));
+      } else {
+        throw new Error('PROMO_CODE_INVALID');
+      }
+    }
+
     if (discountCents > totalCents) discountCents = totalCents;
 
     // Get active shipping template
@@ -1544,6 +1561,7 @@ app.post('/api/admin/init-db', async (req, res) => {
         "phone" text NOT NULL,
         "detail" text NOT NULL,
         "is_default" boolean DEFAULT false,
+        "remark" text,
         "created_at" timestamp DEFAULT now(),
         "updated_at" timestamp DEFAULT now()
       );
@@ -1626,6 +1644,7 @@ app.post('/api/admin/init-db', async (req, res) => {
       await db.execute(sql.raw(`ALTER TABLE carts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT now()`));
       await db.execute(sql.raw(`ALTER TABLE discounts ADD COLUMN IF NOT EXISTS name_zh VARCHAR(255)`));
       await db.execute(sql.raw(`ALTER TABLE discounts ADD COLUMN IF NOT EXISTS name_en VARCHAR(255)`));
+      await db.execute(sql.raw(`ALTER TABLE addresses ADD COLUMN IF NOT EXISTS remark TEXT`));
     } catch(e) {
       console.log('Patching DB columns failed:', e.message);
     }

@@ -19,10 +19,36 @@ export default function CheckoutView({ locale, userId, onOrderPlaced }: Checkout
   
   const [selectedPayment, setSelectedPayment] = useState<'fps' | 'payme' | 'alipayhk' | 'bank_transfer'>('fps');
   const [remark, setRemark] = useState('');
+  const [promoCodeInput, setPromoCodeInput] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [preview, setPreview] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const fetchPreview = (items: any[], code: string) => {
+    if (items.length === 0) return;
+    const payload = items.map((c: any) => ({ skuId: c.skuId, qty: c.qty }));
+    apiFetch('/api/checkout/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: payload, promoCode: code || undefined })
+    })
+    .then(res => res.json())
+    .then(previewData => {
+      if (previewData.code || previewData.error) {
+        setErr(previewData.message || previewData.error);
+        setPromoCode('');
+        if (code) {
+          // If code was applied and invalid, re-fetch without code to ensure preview is correct
+          fetchPreview(items, '');
+        }
+      } else {
+        setPreview(previewData);
+        setErr(null);
+      }
+    })
+    .catch(e => console.error(e));
+  };
 
   useEffect(() => {
     // 1. Fetch checked cart items
@@ -31,27 +57,17 @@ export default function CheckoutView({ locale, userId, onOrderPlaced }: Checkout
       .then(data => {
         const checked = data.filter((i: any) => i.checked);
         setCartItems(checked);
-        
         if (checked.length > 0) {
-          // 2. Fetch checkout preview calculations
-          const payload = checked.map((c: any) => ({ skuId: c.skuId, qty: c.qty }));
-          apiFetch('/api/checkout/preview', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items: payload, promoCode: promoCode ? promoCode : undefined })
-          })
-          .then(res => res.json())
-          .then(previewData => {
-            if (previewData.code || previewData.error) {
-              setErr(previewData.message || previewData.error);
-            } else {
-              setPreview(previewData);
-            }
-          })
-          .catch(e => console.error(e));
+          fetchPreview(checked, promoCode);
         }
       });
   }, [userId]);
+
+  const applyPromoCode = () => {
+    setErr(null);
+    setPromoCode(promoCodeInput);
+    fetchPreview(cartItems, promoCodeInput);
+  };
 
   const handleSubmit = () => {
     if (cartItems.length === 0) return;
@@ -253,11 +269,33 @@ export default function CheckoutView({ locale, userId, onOrderPlaced }: Checkout
           </div>
         </div>
 
-        {/* Purchase Summary card */}
+          {/* Purchase Summary card */}
         <div className="bg-gray-50 p-6 rounded-2xl border border-gray-150 h-max space-y-6">
           <h2 className="text-base font-bold text-gray-950 font-display">
             {locale === 'zh-HK' ? '結算清單' : 'Pricing Summary'}
           </h2>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder={locale === 'zh-HK' ? '輸入優惠碼' : 'Enter Promo Code'}
+              value={promoCodeInput}
+              onChange={e => setPromoCodeInput(e.target.value.toUpperCase())}
+              className="flex-1 border border-gray-250 p-3 rounded-lg text-xs font-mono focus:outline-none focus:border-neutral-950"
+            />
+            <button
+              onClick={applyPromoCode}
+              disabled={!promoCodeInput.trim()}
+              className="bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white px-4 py-3 rounded-lg text-xs font-bold transition-colors"
+            >
+              {locale === 'zh-HK' ? '應用' : 'Apply'}
+            </button>
+          </div>
+          {promoCode && !err && (
+            <div className="text-xs text-emerald-600 bg-emerald-50 p-2 rounded border border-emerald-100">
+              Promo code <strong>{promoCode}</strong> applied.
+            </div>
+          )}
 
           <div className="space-y-3.5 border-b border-gray-200 pb-5">
             <div className="flex justify-between text-xs text-gray-500">

@@ -15,6 +15,13 @@
       "when": 1783944425722,
       "tag": "0001_tired_fenris",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784026160304,
+      "tag": "0002_glossy_gauntlet",
+      "breakpoints": true
     }
   ]
 }
