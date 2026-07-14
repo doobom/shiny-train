@@ -89,7 +89,8 @@ export default function ProductDetail({
 
   
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/?product=${product.id}`;
+    const baseUrl = window.location.href.split('?')[0];
+    const shareUrl = `${baseUrl}?product=${product.id}`;
     const shareData = {
       title: product.nameZh || product.nameEn,
       text: 'Check out this product!',

@@ -31,7 +31,6 @@ export default function App() {
   // @ts-ignore
   const appMode = import.meta.env.VITE_APP_MODE || 'both'; // 'user' | 'admin' | 'both'
   const [isAdminMode, setIsAdminMode] = useState<boolean>(appMode === 'admin' || window.location.search.includes('mode=admin'));
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentView, setCurrentView] = useState<ViewState>('shop_home');
   const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('dashboard');
 
@@ -134,6 +133,10 @@ export default function App() {
   }, [tokenReady, userId, currentView]);
 
   useEffect(() => {
+    const isDark = localStorage.getItem('theme') === 'dark';
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    }
     const params = new URLSearchParams(window.location.search);
     const productParam = params.get('product');
     if (productParam) {

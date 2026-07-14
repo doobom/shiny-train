@@ -109,6 +109,8 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
   // Form states for Coupons
   const [showAddCoupon, setShowAddCoupon] = useState(false);
   const [couponCode, setCouponCode] = useState('');
+  const [couponNameZh, setCouponNameZh] = useState('');
+  const [couponNameEn, setCouponNameEn] = useState('');
   const [couponType, setCouponType] = useState<'percentage' | 'fixed'>('fixed');
   const [couponValue, setCouponValue] = useState(0);
   const [couponMinOrder, setCouponMinOrder] = useState(0);
@@ -167,6 +169,8 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
     if (!couponCode) return;
     const payload = {
       code: couponCode,
+      nameZh: couponNameZh,
+      nameEn: couponNameEn,
       type: couponType,
       value: couponValue,
       minOrderValueCents: couponMinOrder,
@@ -180,6 +184,8 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
     setNotif('Coupon code added');
     setShowAddCoupon(false);
     setCouponCode('');
+    setCouponNameZh('');
+    setCouponNameEn('');
     fetchData();
     setTimeout(() => setNotif(null), 3000);
   };
@@ -338,9 +344,17 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
             <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm animate-fade-in">
               <h2 className="text-sm font-bold text-gray-950 font-display mb-4 border-b pb-2">{dict.addCoupon}</h2>
               <form onSubmit={handleAddCoupon} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-gray-600">
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 md:col-span-2">
                   <label>{dict.couponCode}</label>
                   <input type="text" required value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} className="w-full border p-2.5 rounded-lg text-gray-950 font-medium uppercase" />
+                </div>
+                <div className="space-y-1.5">
+                  <label>{dict.nameZh}</label>
+                  <input type="text" required value={couponNameZh} onChange={e => setCouponNameZh(e.target.value)} className="w-full border p-2.5 rounded-lg text-gray-950 font-medium" />
+                </div>
+                <div className="space-y-1.5">
+                  <label>{dict.nameEn}</label>
+                  <input type="text" required value={couponNameEn} onChange={e => setCouponNameEn(e.target.value)} className="w-full border p-2.5 rounded-lg text-gray-950 font-medium" />
                 </div>
                 <div className="space-y-1.5">
                   <label>{dict.type}</label>
@@ -369,6 +383,7 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100 text-gray-400 font-bold uppercase tracking-wider">
+                    <th className="p-4">{dict.descriptions}</th>
                     <th className="p-4">{dict.code}</th>
                     <th className="p-4">{dict.type}</th>
                     <th className="p-4">{dict.value}</th>
@@ -380,6 +395,7 @@ export default function AdminMarketing({ locale }: AdminMarketingProps) {
                 <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
                   {discounts.map(d => (
                     <tr key={d.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="p-4"><span className="font-bold text-gray-950 block">{locale === 'zh-HK' ? d.nameZh : d.nameEn}</span></td>
                       <td className="p-4"><span className="font-bold text-gray-950 font-mono tracking-wider bg-gray-100 px-2 py-1 rounded">{d.code}</span></td>
                       <td className="p-4 uppercase text-[10px]">{d.type}</td>
                       <td className="p-4 font-mono font-bold text-amber-600">

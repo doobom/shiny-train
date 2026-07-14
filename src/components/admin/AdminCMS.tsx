@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchWithAuth as apiFetch } from '../../utils/api';
 import { Locale, Banner, Announcement, FAQ } from '../../types';
-import { Image, Volume2, HelpCircle, PlusCircle, Trash } from 'lucide-react';
+import { Image, Volume2, HelpCircle, PlusCircle, Trash, Edit } from 'lucide-react';
 
 export default function AdminCMS({ locale }: { locale: Locale }) {
   const dict = {
@@ -108,18 +108,40 @@ export default function AdminCMS({ locale }: { locale: Locale }) {
     fetchData();
   };
 
+  const [editingFaqId, setEditingFaqId] = useState<string | null>(null);
+
   const addFaq = async (e: React.FormEvent) => {
     e.preventDefault();
-    await apiFetch('/api/admin/faqs', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ questionZh: newFaqQZh, questionEn: newFaqQEn, answerZh: newFaqAZh, answerEn: newFaqAEn })
-    });
+    if (editingFaqId) {
+      await apiFetch(`/api/admin/faqs/${editingFaqId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionZh: newFaqQZh, questionEn: newFaqQEn, answerZh: newFaqAZh, answerEn: newFaqAEn })
+      });
+      setEditingFaqId(null);
+    } else {
+      await apiFetch('/api/admin/faqs', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionZh: newFaqQZh, questionEn: newFaqQEn, answerZh: newFaqAZh, answerEn: newFaqAEn })
+      });
+    }
     setNewFaqQZh(''); setNewFaqQEn(''); setNewFaqAZh(''); setNewFaqAEn('');
     fetchData();
   };
 
+  const handleEditFaq = (f: FAQ) => {
+    setEditingFaqId(f.id);
+    setNewFaqQZh(f.questionZh);
+    setNewFaqQEn(f.questionEn);
+    setNewFaqAZh(f.answerZh);
+    setNewFaqAEn(f.answerEn);
+  };
+
   const deleteFaq = async (id: string) => {
     await apiFetch(`/api/admin/faqs/${id}`, { method: 'DELETE' });
+    if (editingFaqId === id) {
+      setEditingFaqId(null);
+      setNewFaqQZh(''); setNewFaqQEn(''); setNewFaqAZh(''); setNewFaqAEn('');
+    }
     fetchData();
   };
 
@@ -180,14 +202,17 @@ export default function AdminCMS({ locale }: { locale: Locale }) {
 
       {activeTab === 'faqs' && (
         <div className="bg-white p-5 rounded-xl border border-gray-200">
-          <h3 className="font-bold mb-4">{dict.addFaq}</h3>
+          <h3 className="font-bold mb-4">{editingFaqId ? (locale === 'zh-HK' ? '編輯常見問題' : 'Edit FAQ') : dict.addFaq}</h3>
           <form onSubmit={addFaq} className="grid grid-cols-2 gap-4 mb-6">
             <input placeholder={dict.qZh} value={newFaqQZh} onChange={e=>setNewFaqQZh(e.target.value)} required className="border p-2 rounded-lg text-xs" />
             <input placeholder={dict.qEn} value={newFaqQEn} onChange={e=>setNewFaqQEn(e.target.value)} required className="border p-2 rounded-lg text-xs" />
             <input placeholder={dict.aZh} value={newFaqAZh} onChange={e=>setNewFaqAZh(e.target.value)} required className="border p-2 rounded-lg text-xs" />
             <input placeholder={dict.aEn} value={newFaqAEn} onChange={e=>setNewFaqAEn(e.target.value)} required className="border p-2 rounded-lg text-xs" />
             <div className="col-span-2 text-right">
-              <button className="bg-neutral-900 text-white px-6 py-2 rounded-lg text-xs font-bold"><PlusCircle className="inline w-4 h-4 mr-1" /> {dict.addFaq}</button>
+              {editingFaqId && (
+                <button type="button" onClick={() => { setEditingFaqId(null); setNewFaqQZh(''); setNewFaqQEn(''); setNewFaqAZh(''); setNewFaqAEn(''); }} className="bg-gray-100 text-gray-600 px-6 py-2 rounded-lg text-xs font-bold mr-2 hover:bg-gray-200">Cancel</button>
+              )}
+              <button type="submit" className="bg-neutral-900 text-white px-6 py-2 rounded-lg text-xs font-bold"><PlusCircle className="inline w-4 h-4 mr-1" /> {editingFaqId ? (locale === 'zh-HK' ? '儲存變更' : 'Save') : dict.addFaq}</button>
             </div>
           </form>
           <div className="space-y-4">
@@ -197,7 +222,10 @@ export default function AdminCMS({ locale }: { locale: Locale }) {
                   <p className="font-bold text-sm mb-1">{f.questionZh}</p>
                   <p className="text-xs text-gray-600 mb-2">{f.answerZh}</p>
                 </div>
-                <button onClick={() => deleteFaq(f.id)} className="text-red-500"><Trash className="w-4 h-4" /></button>
+                <div className="flex gap-2">
+                  <button onClick={() => handleEditFaq(f)} className="text-blue-500 hover:text-blue-600"><Edit className="w-4 h-4" /></button>
+                  <button onClick={() => deleteFaq(f.id)} className="text-red-500 hover:text-red-600"><Trash className="w-4 h-4" /></button>
+                </div>
               </div>
             ))}
           </div>

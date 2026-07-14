@@ -59,8 +59,7 @@ export default function AdminOrders({ locale }: AdminOrdersProps) {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        newTotalCents: newPrice,
-        adminUsername: 'admin'
+        grandTotalCents: newPrice
       })
     })
     .then(res => res.json())

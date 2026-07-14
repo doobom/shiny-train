@@ -163,6 +163,8 @@ export const platformSettings = pgTable('platform_settings', {
 export const discounts = pgTable('discounts', {
   id: text('id').primaryKey(),
   code: text('code').unique().notNull(),
+  nameZh: text('name_zh'),
+  nameEn: text('name_en'),
   type: text('type').notNull(),
   value: integer('value').notNull(),
   minOrderValueCents: integer('min_order_value_cents'),

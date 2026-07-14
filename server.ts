@@ -1573,7 +1573,8 @@ app.post('/api/admin/init-db', async (req, res) => {
         "code" text NOT NULL UNIQUE,
         "name_zh" text NOT NULL,
         "name_en" text NOT NULL,
-        "description" text
+        "description" text,
+        "created_at" timestamp DEFAULT now()
       );
 
       CREATE TABLE IF NOT EXISTS "role_permissions" (
@@ -1621,6 +1622,10 @@ app.post('/api/admin/init-db', async (req, res) => {
       await db.execute(sql.raw(`ALTER TABLE products ADD COLUMN IF NOT EXISTS images JSONB DEFAULT '[]'`));
       await db.execute(sql.raw(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS link_url VARCHAR(255)`));
       await db.execute(sql.raw(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS disabled BOOLEAN DEFAULT FALSE`));
+      await db.execute(sql.raw(`ALTER TABLE roles ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT now()`));
+      await db.execute(sql.raw(`ALTER TABLE carts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT now()`));
+      await db.execute(sql.raw(`ALTER TABLE discounts ADD COLUMN IF NOT EXISTS name_zh VARCHAR(255)`));
+      await db.execute(sql.raw(`ALTER TABLE discounts ADD COLUMN IF NOT EXISTS name_en VARCHAR(255)`));
     } catch(e) {
       console.log('Patching DB columns failed:', e.message);
     }
@@ -1863,10 +1868,10 @@ app.get('/api/admin/discounts', authenticateAdmin, async (req, res) => {
   res.json(discounts);
 });
 app.post('/api/admin/discounts', authenticateAdmin, async (req, res) => {
-  const { code, type, value, minOrderValueCents, validUntil } = req.body;
+  const { code, nameZh, nameEn, type, value, minOrderValueCents, validUntil } = req.body;
   const id = 'dsc_' + require('uuid').v4().substring(0, 8);
   await db.insert(schema.discounts).values({ 
-    id, code, type, value: parseInt(value), 
+    id, code, nameZh, nameEn, type, value: parseInt(value), 
     minOrderValueCents: parseInt(minOrderValueCents), 
     validUntil: validUntil ? new Date(validUntil) : null 
   });

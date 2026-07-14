@@ -357,7 +357,30 @@ export default function UserProfile({ userId, locale, onPayNow }: UserProfilePro
               </div>
             </div>
             
-            
+            <div className="mt-6 border-t pt-4">
+              <div className="flex items-center justify-between bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <div>
+                  <h4 className="text-xs font-bold text-gray-900">{locale === 'zh-HK' ? '外觀主題' : 'Appearance'}</h4>
+                  <p className="text-[10px] text-gray-500 mt-0.5">{locale === 'zh-HK' ? '切換深色/淺色模式' : 'Toggle dark or light theme'}</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    const isDark = document.documentElement.classList.contains('dark');
+                    if (isDark) {
+                      document.documentElement.classList.remove('dark');
+                      localStorage.setItem('theme', 'light');
+                    } else {
+                      document.documentElement.classList.add('dark');
+                      localStorage.setItem('theme', 'dark');
+                    }
+                  }}
+                  className="w-12 h-6 bg-gray-200 dark:bg-emerald-500 rounded-full relative transition-colors focus:outline-none"
+                >
+                  <div className="w-5 h-5 bg-white rounded-full absolute top-0.5 left-0.5 dark:translate-x-6 transition-transform shadow-sm"></div>
+                </button>
+              </div>
+            </div>
+
             <form onSubmit={async (e) => {
               e.preventDefault();
               setEmailMsg('');
