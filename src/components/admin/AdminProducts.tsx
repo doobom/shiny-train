@@ -10,6 +10,63 @@ interface AdminProductsProps {
   locale: Locale;
 }
 
+
+const RichTextEditor = ({ value, onChange }: { value: string, onChange: (v: string) => void }) => {
+  const quillRef = React.useRef<any>(null);
+
+  const imageHandler = React.useCallback(() => {
+    const input = document.createElement('input');
+    input.setAttribute('type', 'file');
+    input.setAttribute('accept', 'image/*');
+    input.click();
+
+    input.onchange = async () => {
+      const file = input.files ? input.files[0] : null;
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const token = localStorage.getItem('jwt_token');
+        const res = await fetch('/api/admin/upload', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData
+        });
+        const data = await res.json();
+        
+        if (data.url && quillRef.current) {
+          const editor = quillRef.current.getEditor();
+          const range = editor.getSelection(true) || { index: editor.getLength() };
+          editor.insertEmbed(range.index, 'image', data.url);
+          editor.setSelection(range.index + 1);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+  }, []);
+
+  const modules = React.useMemo(() => ({
+    toolbar: {
+      container: [
+        [{ 'header': [1, 2, false] }],
+        ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+        [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
+        ['link', 'image'],
+        ['clean']
+      ],
+      handlers: {
+        image: imageHandler
+      }
+    }
+  }), [imageHandler]);
+
+    // @ts-ignore
+  return <ReactQuill ref={quillRef} modules={modules} theme="snow" value={value} onChange={onChange} className="bg-white" />;
+};
+
 export default function AdminProducts({ locale }: AdminProductsProps) {
   const [activeTab, setActiveTab] = useState<'products'|'categories'|'warnings'>('products');
   
@@ -367,11 +424,11 @@ export default function AdminProducts({ locale }: AdminProductsProps) {
               <div className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase block">{locale === "zh-HK" ? "詳細描述 (中文)" : "Description (ZH)"}</label>
-                  <ReactQuill modules={quillModules} theme="snow" value={descriptionZh} onChange={setDescriptionZh} className="bg-white" />
+                  <RichTextEditor value={descriptionZh} onChange={setDescriptionZh} />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-500 uppercase block">{locale === "zh-HK" ? "詳細描述 (英文)" : "Description (EN)"}</label>
-                  <ReactQuill modules={quillModules} theme="snow" value={descriptionEn} onChange={setDescriptionEn} className="bg-white" />
+                  <RichTextEditor value={descriptionEn} onChange={setDescriptionEn} />
                 </div>
               </div>
 

@@ -83,6 +83,32 @@ app.get('/api/test-col', async (req, res) => { try { const r = await db.execute(
 
 import { S3Client } from '@aws-sdk/client-s3';
 import multerS3 from 'multer-s3';
+
+const s3 = new S3Client({
+  region: "auto",
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+  },
+});
+
+const uploadR2 = multer({
+  storage: multerS3({
+    s3: s3,
+    bucket: process.env.R2_BUCKET_NAME || 'my-bucket',
+    acl: 'public-read',
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    key: function (req, file, cb) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = file.originalname.split('.').pop();
+      cb(null, `uploads/${uniqueSuffix}.${ext}`);
+    }
+  })
+});
+
+
+
 import { Resend } from 'resend';
 
 const globalLimiter = rateLimit({
@@ -168,6 +194,8 @@ const authenticateToken = (req: express.Request, res: express.Response, next: ex
 };
 
 
+
+
 const authenticateAdmin = (req: any, res: any, next: any) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -178,6 +206,22 @@ const authenticateAdmin = (req: any, res: any, next: any) => {
     if (!dbUser || dbUser.role !== 'admin') {
       return res.status(403).json({ code: 'FORBIDDEN', message: 'Admin access required' });
     }
+
+
+app.post('/api/admin/upload', authenticateAdmin, uploadR2.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  const file = req.file; 
+  let url;
+  if (process.env.R2_PUBLIC_URL) {
+      const publicUrl = process.env.R2_PUBLIC_URL.replace(/\/$/, '');
+      url = `${publicUrl}/${(file as any).key}`;
+  } else {
+      url = `https://${process.env.R2_BUCKET_NAME}.${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${(file as any).key}`;
+  }
+  res.json({ success: true, url });
+});
     
     // Load Role Permissions and merge
     const rolePerms = await db.query.rolePermissions.findMany({
