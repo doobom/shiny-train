@@ -3,6 +3,7 @@ import { parse } from 'csv-parse/sync';
 import 'dotenv/config';
 import { migrate } from './src/server/db.js';
 import express from 'express';
+import compression from 'compression';
 import 'express-async-errors';
 import cors from 'cors';
 import path from 'path';
@@ -52,6 +53,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
 const app = express();
+app.use(compression());
 const upload = multer({ storage: multer.memoryStorage() });
 const PORT = 3000;
 
@@ -77,6 +79,8 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+
 app.get('/api/test-col', async (req, res) => { try { const r = await db.execute(sql.raw(`SELECT * FROM users`)); return res.json(r.rows || r); } catch(e) { return res.json({e: e.message, s: e.stack}); } });
 
 
@@ -208,20 +212,7 @@ const authenticateAdmin = (req: any, res: any, next: any) => {
     }
 
 
-app.post('/api/admin/upload', authenticateAdmin, uploadR2.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-  const file = req.file; 
-  let url;
-  if (process.env.R2_PUBLIC_URL) {
-      const publicUrl = process.env.R2_PUBLIC_URL.replace(/\/$/, '');
-      url = `${publicUrl}/${(file as any).key}`;
-  } else {
-      url = `https://${process.env.R2_BUCKET_NAME}.${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${(file as any).key}`;
-  }
-  res.json({ success: true, url });
-});
+
     
     // Load Role Permissions and merge
     const rolePerms = await db.query.rolePermissions.findMany({
@@ -244,6 +235,21 @@ app.post('/api/admin/upload', authenticateAdmin, uploadR2.single('file'), (req, 
     next();
   });
 };
+
+app.post('/api/admin/upload', authenticateAdmin, uploadR2.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  const file = req.file; 
+  let url;
+  if (process.env.R2_PUBLIC_URL) {
+      const publicUrl = process.env.R2_PUBLIC_URL.replace(/\/\$/, '');
+      url = `${publicUrl}/${(file as any).key}`;
+  } else {
+      url = `https://${process.env.R2_BUCKET_NAME}.${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${(file as any).key}`;
+  }
+  res.json({ success: true, url });
+});
 
 const requirePermission = (module: string) => {
   return (req: any, res: any, next: any) => {
@@ -704,6 +710,7 @@ app.patch('/api/cart/items/:itemId', authenticateToken, async (req, res) => {
 app.delete('/api/cart/items/:itemId', authenticateToken, async (req, res) => {
   await db.delete(schema.cartItems).where(eq(schema.cartItems.id, req.params.itemId));
   res.json({ success: true });
+
 });
 
 app.post('/api/cart/batch', authenticateToken, async (req, res) => {
@@ -821,6 +828,7 @@ app.post('/api/checkout/preview', authenticateToken, async (req, res) => {
     totalCents,
     itemDetails
   });
+
 });
 
 app.post('/api/orders', authenticateToken, async (req, res) => {
@@ -990,11 +998,13 @@ app.get('/api/orders/:id', async (req, res) => {
   if (!order) return res.status(404).json({ code: 'NOT_FOUND' });
   const items = await db.query.orderItems.findMany({ where: eq(schema.orderItems.orderId, order.id) });
   res.json({ ...order, items });
+
 });
 
 app.post('/api/orders/:id/confirm-receipt', async (req, res) => {
   await db.update(schema.orders).set({ status: 'completed' }).where(eq(schema.orders.id, req.params.id));
   res.json({ success: true });
+
 });
 
 app.post('/api/orders/:id/cancel', async (req, res) => {
@@ -1028,6 +1038,7 @@ app.post('/api/payments/webhook/:method', async (req, res) => {
   sendTransactionalEmail(user?.email || 'admin@example.com', 'Payment Successful: ' + orderId, 'Your payment has been processed successfully.');
   
   res.json({ received: true });
+
 });
 
 app.post('/api/payments/:orderId/charge', authenticateToken, async (req, res) => {
@@ -1035,6 +1046,7 @@ app.post('/api/payments/:orderId/charge', authenticateToken, async (req, res) =>
   // Webhook will handle actual status update in a real flow. 
   // For demo, we just return the mock secret. The frontend will pretend it succeeded and call webhook or we can just let frontend assume it paid.
   res.json({ success: true, clientSecret: 'mock_secret_xyz' });
+
 });
 
 app.post('/api/payments/:orderId/voucher', authenticateToken, async (req, res) => {
@@ -1139,11 +1151,12 @@ app.get('/api/admin/stats', authenticateAdmin, async (req, res) => {
   });
 });
 
+
 app.get('/api/admin/products', authenticateAdmin, requirePermission('products'), async (req, res) => {
   const prods = await db.query.products.findMany({ orderBy: [desc(schema.products.createdAt)] });
   const allSpecs = await db.query.productSpecs.findMany();
   const allInv = await db.query.inventory.findMany();
-
+  
   const result = prods.map(prod => {
     const specs = allSpecs.filter(s => s.productId === prod.id).map(s => {
       const inv = allInv.find(i => i.skuId === s.id) || { stock: 0, lockedStock: 0, warnThreshold: 10 };
@@ -1156,10 +1169,63 @@ app.get('/api/admin/products', authenticateAdmin, requirePermission('products'),
     });
     return { ...prod, specs };
   });
-
   res.json(result);
 });
 
+app.post('/api/admin/products', authenticateAdmin, requirePermission('products'), async (req, res) => {
+  const data = req.body;
+  const id = `prod_${uuidv4().substring(0,8)}`;
+  
+  await db.insert(schema.products).values({
+    id,
+    nameZh: data.nameZh,
+    nameEn: data.nameEn,
+    descriptionZh: data.descriptionZh,
+    descriptionEn: data.descriptionEn,
+    priceOriginalCents: data.priceOriginalCents,
+    priceAfterCents: data.priceAfterCents,
+    categoryId: data.categoryId,
+    images: data.images || data.imageUrls || (data.imageUrl ? [data.imageUrl] : [])
+  });
+
+  if (data.specs && data.specs.length > 0) {
+    for (const spec of data.specs) {
+      const specId = `spec_${uuidv4().substring(0,8)}`;
+      await db.insert(schema.productSpecs).values({
+        id: specId,
+        productId: id,
+        specNameZh: spec.specNameZh || '標準規格',
+        specNameEn: spec.specNameEn || 'Standard Option',
+        priceOriginalCents: data.priceOriginalCents,
+        priceAfterCents: data.priceAfterCents
+      });
+      await db.insert(schema.inventory).values({
+        skuId: specId,
+        stock: spec.stock || 0,
+        lockedStock: 0,
+        warnThreshold: spec.warnThreshold || 10
+      });
+    }
+  } else {
+    const specId = `spec_${uuidv4().substring(0,8)}`;
+    await db.insert(schema.productSpecs).values({
+      id: specId,
+      productId: id,
+      specNameZh: '標準規格',
+      specNameEn: 'Standard Option',
+      priceOriginalCents: data.priceOriginalCents,
+      priceAfterCents: data.priceAfterCents
+    });
+    await db.insert(schema.inventory).values({
+      skuId: specId,
+      stock: 100,
+      lockedStock: 0,
+      warnThreshold: 10
+    });
+  }
+
+  res.json({ success: true, id });
+});
 
 app.put('/api/admin/products/:id', authenticateAdmin, requirePermission('products'), async (req, res) => {
   const data = req.body;
@@ -1171,30 +1237,14 @@ app.put('/api/admin/products/:id', authenticateAdmin, requirePermission('product
     priceOriginalCents: data.priceOriginalCents,
     priceAfterCents: data.priceAfterCents,
     categoryId: data.categoryId,
-    images: data.images || (data.imageUrl ? [data.imageUrl] : [])
+    images: data.images || data.imageUrls || (data.imageUrl ? [data.imageUrl] : [])
   }).where(eq(schema.products.id, req.params.id));
-  res.json({ success: true });
-});
-
-app.post('/api/admin/products', authenticateAdmin, requirePermission('products'), async (req, res) => {
-  const data = req.body;
-  const id = `prod_${uuidv4().substring(0,8)}`;
-  await db.insert(schema.products).values({
-    id,
-    nameZh: data.nameZh,
-    nameEn: data.nameEn,
-    descriptionZh: data.descriptionZh,
-    descriptionEn: data.descriptionEn,
+  
+  await db.update(schema.productSpecs).set({
     priceOriginalCents: data.priceOriginalCents,
-    priceAfterCents: data.priceAfterCents,
-    categoryId: data.categoryId,
-    images: data.images || (data.imageUrl ? [data.imageUrl] : [])
-  });
-  res.json({ success: true, id });
-});
+    priceAfterCents: data.priceAfterCents
+  }).where(eq(schema.productSpecs.productId, req.params.id));
 
-app.patch('/api/admin/products/:id', authenticateAdmin, async (req, res) => {
-  await db.update(schema.products).set(req.body).where(eq(schema.products.id, req.params.id));
   res.json({ success: true });
 });
 
@@ -1259,6 +1309,7 @@ app.patch('/api/admin/orders/:id/price', authenticateAdmin, requirePermission('o
     });
   });
   res.json({ success: true });
+
 });
 
 app.post('/api/admin/orders/:id/close', authenticateAdmin, requirePermission('orders'), async (req, res) => {
@@ -1292,6 +1343,7 @@ app.get('/api/admin/payments/review-queue', authenticateAdmin, requirePermission
     if (o.user) o.user.phoneEncrypted = decrypt(o.user.phoneEncrypted);
   });
   res.json({ success: true, queue: pendingOrders });
+
 });
 
 app.post('/api/admin/orders/:id/approve-payment', authenticateAdmin, requirePermission('orders'), async (req, res) => {
@@ -1310,6 +1362,7 @@ app.post('/api/admin/orders/:id/approve-payment', authenticateAdmin, requirePerm
     }
   });
   res.json({ success: true });
+
 });
 
 app.post('/api/admin/orders/:id/reject-payment', authenticateAdmin, requirePermission('orders'), async (req, res) => {
@@ -1320,6 +1373,7 @@ app.post('/api/admin/orders/:id/reject-payment', authenticateAdmin, requirePermi
     await tx.update(schema.payments).set({ status: 'failed' }).where(eq(schema.payments.orderId, req.params.id));
   });
   res.json({ success: true });
+
 });
 
 app.post('/api/admin/orders/:id/remark', authenticateAdmin, requirePermission('orders'), async (req, res) => {
@@ -1374,6 +1428,7 @@ app.patch('/api/admin/settings', authenticateAdmin, async (req, res) => {
     }
   });
   res.json({ success: true });
+
 });
 
 app.post('/api/admin/backups/trigger', authenticateAdmin, async (req, res) => {
@@ -1841,6 +1896,7 @@ app.delete('/api/favorites/:productId', authenticateToken, async (req, res) => {
   const userId = (req as any).user.id;
   await db.delete(schema.favorites).where(and(eq(schema.favorites.userId, userId), eq(schema.favorites.productId, req.params.productId)));
   res.json({ success: true });
+
 });
 
 app.post('/api/favorites/:productId', authenticateToken, async (req, res) => {
@@ -1941,6 +1997,7 @@ app.put('/api/admin/banners/:id', authenticateAdmin, async (req, res) => {
   const { imageUrl, linkUrl, sort, disabled } = req.body;
   await db.update(schema.banners).set({ imageUrl, linkUrl, sort: parseInt(sort)||0, disabled: !!disabled }).where(eq(schema.banners.id, req.params.id));
   res.json({ success: true });
+
 });
 
 app.post('/api/admin/announcements', authenticateAdmin, async (req, res) => {
@@ -1953,6 +2010,7 @@ app.put('/api/admin/announcements/:id', authenticateAdmin, async (req, res) => {
   const { titleZh, titleEn, contentZh, contentEn } = req.body;
   await db.update(schema.announcements).set({ titleZh, titleEn, contentZh, contentEn }).where(eq(schema.announcements.id, req.params.id));
   res.json({ success: true });
+
 });
 
 app.post('/api/admin/faqs', authenticateAdmin, async (req, res) => {
@@ -2009,6 +2067,7 @@ app.post('/api/admin/products/batch-discount', authenticateAdmin, async (req, re
     }
   });
   res.json({ success: true });
+
 });
 
 app.post('/api/admin/discounts', authenticateAdmin, async (req, res) => {
@@ -2420,7 +2479,7 @@ if (!isProduction) {
   }).catch(console.error);
 } else {
   const distPath = path.join(process.cwd(), 'dist');
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { maxAge: '1y', setHeaders: (res, path) => { if (path.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache'); } }));
   app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });

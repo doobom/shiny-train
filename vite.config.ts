@@ -19,7 +19,7 @@ export default defineConfig(() => {
           manualChunks: {
             'vendor-react': ['react', 'react-dom'],
             'vendor-quill': ['react-quill-new', 'quill'],
-            'vendor-icons': ['lucide-react'], 'vendor-charts': ['recharts'], 'vendor-motion': ['motion']
+            'vendor-icons': ['lucide-react'], 'vendor-charts': ['recharts'], 'vendor-motion': ['motion'], 'vendor-drizzle': ['drizzle-orm', '@electric-sql/pglite']
           }
         }
       }

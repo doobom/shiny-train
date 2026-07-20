@@ -1,0 +1,4 @@
+Unbalanced route starting at index 91137 depth: 1
+app.delete('/api/admin/tiers/:id', authenticateAdmin, async (req, res) => {   await db.delete(schema
+Unbalanced route starting at index 92059 depth: -1
+app.get('*', (req, res) => {     res.sendFile(path.join(distPath, 'index.html'));   });   app.listen
